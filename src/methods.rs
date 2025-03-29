@@ -14,14 +14,10 @@ pub fn encode(message: &[u8], parity: usize) -> Result<Vec<u8>, EncodeError> {
 
 /// Verifies the error-correcting code and returns the message.
 /// # Errors
-/// - `RSConstructorError` is returned if `len(received)` > `255`.
-/// - `RSConstructorError` is returned if `len(received)` > `255`.
-/// - `RSEncodeError` is returned if encoding fails for any reason.
-pub fn decode(received: &[u8], parity: usize) -> Result<Vec<u8>, DecodeError> {
-    let parity: u8 = parity
-        .try_into()
-        .or(Err(DecodeError::ParityTooLarge(u32::try_from(parity)?)))?;
-
+/// - `InputTooLarge` is returned if `len(received)` > 255 bytes.
+/// - `InsufficientParityBytes` is returned if `parity > length / 2`.
+/// - `RSEDeodeError` is returned if decoding fails for any reason.
+pub fn decode(received: &[u8], parity: u8) -> Result<Vec<u8>, DecodeError> {
     let length = received.len();
     let length: u8 = length
         .try_into()

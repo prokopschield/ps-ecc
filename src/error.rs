@@ -64,8 +64,6 @@ pub enum DecodeError {
     InputTooLarge(u32),
     #[error("Insufficient input bytes for parity count of {0}: {0} * 2 > {1}.")]
     InsufficientParityBytes(u8, u8),
-    #[error("Parity too large, {0} > 127.")]
-    ParityTooLarge(u32),
     #[error(transparent)]
     RSConstructorError(#[from] RSConstructorError),
     #[error(transparent)]
