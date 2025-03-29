@@ -47,3 +47,28 @@ pub enum RSDecodeError {
     #[error("Derivative evaluated to zero.")]
     ZeroDerivative,
 }
+
+#[derive(Error, Debug)]
+pub enum EncodeError {
+    #[error(transparent)]
+    RSConstructorError(#[from] RSConstructorError),
+    #[error(transparent)]
+    RSEncodeError(#[from] RSEncodeError),
+}
+
+#[derive(Error, Debug)]
+pub enum DecodeError {
+    #[error("Parity count is too large. Did the message get truncated? {0} > ({1} / 2)")]
+    ParityTooLarge(usize, usize),
+    #[error(transparent)]
+    RSConstructorError(#[from] RSConstructorError),
+    #[error(transparent)]
+    RSDecodeError(#[from] RSDecodeError),
+}
+#[derive(Error, Debug)]
+pub enum EccError {
+    #[error(transparent)]
+    EncodeError(#[from] EncodeError),
+    #[error(transparent)]
+    DecodeError(#[from] DecodeError),
+}
