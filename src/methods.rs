@@ -18,12 +18,21 @@ pub fn encode(message: &[u8], parity: usize) -> Result<Vec<u8>, EncodeError> {
 /// - `RSConstructorError` is returned if `len(received)` > `255`.
 /// - `RSEncodeError` is returned if encoding fails for any reason.
 pub fn decode(received: &[u8], parity: usize) -> Result<Vec<u8>, DecodeError> {
-    if parity > received.len() >> 1 {
-        return Err(DecodeError::ParityTooLarge(parity, received.len()));
+    let parity: u8 = parity
+        .try_into()
+        .or(Err(DecodeError::ParityTooLarge(u32::try_from(parity)?)))?;
+
+    let length = received.len();
+    let length: u8 = length
+        .try_into()
+        .or(Err(DecodeError::InputTooLarge(u32::try_from(length)?)))?;
+
+    if parity > length >> 1 {
+        return Err(DecodeError::InsufficientParityBytes(parity, length));
     }
 
-    let n = received.len();
-    let k = n - (parity << 1);
+    let n = usize::from(length);
+    let k = n - usize::from(parity << 1);
     let rs = ReedSolomon::new(n, k)?;
 
     Ok(rs.decode(received)?)

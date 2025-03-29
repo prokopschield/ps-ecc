@@ -1,5 +1,7 @@
 #![allow(clippy::module_name_repetitions)]
 
+use std::num::TryFromIntError;
+
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -58,12 +60,18 @@ pub enum EncodeError {
 
 #[derive(Error, Debug)]
 pub enum DecodeError {
-    #[error("Parity count is too large. Did the message get truncated? {0} > ({1} / 2)")]
-    ParityTooLarge(usize, usize),
+    #[error("Input too large, {0} > 255.")]
+    InputTooLarge(u32),
+    #[error("Insufficient input bytes for parity count of {0}: {0} * 2 > {1}.")]
+    InsufficientParityBytes(u8, u8),
+    #[error("Parity too large, {0} > 127.")]
+    ParityTooLarge(u32),
     #[error(transparent)]
     RSConstructorError(#[from] RSConstructorError),
     #[error(transparent)]
     RSDecodeError(#[from] RSDecodeError),
+    #[error(transparent)]
+    TryFromIntError(#[from] TryFromIntError),
 }
 #[derive(Error, Debug)]
 pub enum EccError {
