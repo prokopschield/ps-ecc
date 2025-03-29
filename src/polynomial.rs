@@ -26,7 +26,7 @@ pub fn poly_eval(poly: &[u8], x: u8) -> u8 {
 
 /// Computes the remainder of polynomial division.
 pub fn poly_rem(dividend: &[u8], divisor: &[u8]) -> Result<Vec<u8>, PolynomialError> {
-    use PolynomialError::*;
+    use PolynomialError::ZeroDivisor;
     let mut rem = dividend.to_vec();
     let divisor_deg = degree(divisor).ok_or(ZeroDivisor)?;
     while let Some(deg) = degree(&rem) {
@@ -48,7 +48,7 @@ pub fn poly_rem(dividend: &[u8], divisor: &[u8]) -> Result<Vec<u8>, PolynomialEr
 
 /// Polynomial division returning quotient and remainder.
 pub fn poly_div(dividend: &[u8], divisor: &[u8]) -> Result<(Vec<u8>, Vec<u8>), PolynomialError> {
-    use PolynomialError::*;
+    use PolynomialError::ZeroDivisor;
     let divisor_deg = degree(divisor).ok_or(ZeroDivisor)?;
     let divisor_lc = divisor[divisor_deg];
     let mut quot = vec![0u8; dividend.len().saturating_sub(divisor.len()) + 1];
@@ -78,7 +78,7 @@ pub fn poly_eval_deriv(poly: &[u8], x: u8) -> u8 {
     let mut result = 0u8;
     let x_sq = mul(x, x);
     let mut x_pow = 1u8;
-    for k in 0..((poly.len() - 1) / 2 + 1) {
+    for k in 0..=((poly.len() - 1) / 2) {
         let idx = 2 * k + 1;
         if idx < poly.len() {
             result = add(result, mul(poly[idx], x_pow));

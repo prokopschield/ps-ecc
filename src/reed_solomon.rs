@@ -14,7 +14,7 @@ impl ReedSolomon {
     /// - `TooManyDataSymbols` is returned if k >= n
     /// - `UnevenParity` is returned if (n - k) % 2 != 0
     pub const fn new(n: usize, k: usize) -> Result<Self, RSConstructorError> {
-        use RSConstructorError::*;
+        use RSConstructorError::{TooManyDataSymbols, TooManySymbols, UnevenParity};
 
         if n > 255 {
             return Err(TooManySymbols);
@@ -34,8 +34,11 @@ impl ReedSolomon {
     }
 
     /// Encodes a message into a codeword.
+    /// # Errors
+    /// - `InvalidLength` if `len(message)` does not match `self.k`
+    /// - `PolynomialError` if generator polynomial is zero (shouldn't happen)
     pub fn encode(&self, message: &[u8]) -> Result<Vec<u8>, RSEncodeError> {
-        use RSEncodeError::*;
+        use RSEncodeError::InvalidLength;
         if message.len() != self.k {
             return Err(InvalidLength);
         }
@@ -43,7 +46,7 @@ impl ReedSolomon {
         let g = generate_generator_poly(num_parity);
         let dividend = vec![0u8; num_parity]
             .into_iter()
-            .chain(message.iter().cloned())
+            .chain(message.iter().copied())
             .collect::<Vec<u8>>();
         let mut r = poly_rem(&dividend, &g)?;
         while r.len() < num_parity {
@@ -54,8 +57,14 @@ impl ReedSolomon {
     }
 
     /// Decodes a received codeword, correcting errors if possible.
+    /// # Errors
+    /// - `GFError` if an arithmetic operation fails
+    /// - `InvalidLength` if `len(received)` doesn't match `self.n`
+    /// - `PolynomialError` if `euclidean_for_rs` fails (division by zero)
+    /// - `TooManyErrors` if the input is unrecoverable
+    /// - `ZeroDerivative` shouldn't happen
     pub fn decode(&self, received: &[u8]) -> Result<Vec<u8>, RSDecodeError> {
-        use RSDecodeError::*;
+        use RSDecodeError::{InvalidLength, TooManyErrors, ZeroDerivative};
 
         if received.len() != self.n {
             return Err(InvalidLength);
@@ -120,7 +129,7 @@ impl ReedSolomon {
     }
 }
 
-/// Generates the generator polynomial g(x) = (x - α^1)(x - α^2)...(x - α^num_roots).
+/// Generates the generator polynomial `g(x)` = `(x - α^1)(x - α^2)`...`(x - α^num_roots`).
 #[allow(clippy::needless_range_loop)]
 fn generate_generator_poly(num_roots: usize) -> Vec<u8> {
     let mut g = vec![1u8];

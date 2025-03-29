@@ -28,8 +28,6 @@ pub enum RSConstructorError {
 
 #[derive(Error, Debug)]
 pub enum RSEncodeError {
-    #[error(transparent)]
-    GFError(#[from] GFError),
     #[error("Message length must equal k.")]
     InvalidLength,
     #[error(transparent)]
