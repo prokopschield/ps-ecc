@@ -3,46 +3,42 @@ use crate::finite_field::{add, div, inv, mul, ANTILOG_TABLE};
 use crate::polynomial::{poly_div, poly_eval, poly_eval_deriv, poly_mul, poly_rem};
 
 pub struct ReedSolomon {
-    n: usize, // Total symbols
-    k: usize, // Data symbols
+    parity: u8,
 }
 
 impl ReedSolomon {
     /// Creates a new Reed-Solomon codec with parameters n and k.
     /// # Errors
-    /// - `TooManySymbols` is returned if n > 255
-    /// - `TooManyDataSymbols` is returned if k >= n
-    /// - `UnevenParity` is returned if (n - k) % 2 != 0
-    pub const fn new(n: usize, k: usize) -> Result<Self, RSConstructorError> {
-        use RSConstructorError::{TooManyDataSymbols, TooManySymbols, UnevenParity};
+    /// - `ParityTooHigh` is returned if parity > 127
+    pub const fn new(parity: u8) -> Result<Self, RSConstructorError> {
+        use RSConstructorError::ParityTooHigh;
 
-        if n > 255 {
-            return Err(TooManySymbols);
+        if parity > 127 {
+            return Err(ParityTooHigh);
         }
 
-        if k >= n {
-            return Err(TooManyDataSymbols);
-        }
-
-        if (n - k) % 2 != 0 {
-            return Err(UnevenParity);
-        }
-
-        let codec = Self { n, k };
+        let codec = Self { parity };
 
         Ok(codec)
     }
 
+    #[inline]
+    #[must_use]
+    pub const fn parity(&self) -> u8 {
+        self.parity
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn parity_bytes(&self) -> u8 {
+        self.parity() << 1
+    }
+
     /// Encodes a message into a codeword.
     /// # Errors
-    /// - `InvalidLength` if `len(message)` does not match `self.k`
     /// - `PolynomialError` if generator polynomial is zero (shouldn't happen)
     pub fn encode(&self, message: &[u8]) -> Result<Vec<u8>, RSEncodeError> {
-        use RSEncodeError::InvalidLength;
-        if message.len() != self.k {
-            return Err(InvalidLength);
-        }
-        let num_parity = self.n - self.k;
+        let num_parity = usize::from(self.parity_bytes());
         let g = generate_generator_poly(num_parity);
         let dividend = vec![0u8; num_parity]
             .into_iter()
@@ -59,19 +55,15 @@ impl ReedSolomon {
     /// Decodes a received codeword, correcting errors if possible.
     /// # Errors
     /// - `GFError` if an arithmetic operation fails
-    /// - `InvalidLength` if `len(received)` doesn't match `self.n`
     /// - `PolynomialError` if `euclidean_for_rs` fails (division by zero)
     /// - `TooManyErrors` if the input is unrecoverable
     /// - `ZeroDerivative` shouldn't happen
     pub fn decode(&self, received: &[u8]) -> Result<Vec<u8>, RSDecodeError> {
-        use RSDecodeError::{InvalidLength, TooManyErrors, ZeroDerivative};
+        use RSDecodeError::{TooManyErrors, ZeroDerivative};
 
-        if received.len() != self.n {
-            return Err(InvalidLength);
-        }
-
-        let num_parity = self.n - self.k;
-        let t = num_parity / 2;
+        let num_parity = usize::from(self.parity_bytes());
+        let t = usize::from(self.parity());
+        let n = received.len();
 
         // Compute syndromes
         let mut syndromes = vec![0u8; num_parity];
@@ -89,7 +81,7 @@ impl ReedSolomon {
         omega = omega.iter().map(|&x| mul(x, scale)).collect();
 
         // Find error positions
-        let error_positions: Vec<usize> = (0..self.n)
+        let error_positions: Vec<usize> = (0..n)
             .filter(|&m| {
                 let x = if m == 0 {
                     1
@@ -104,7 +96,7 @@ impl ReedSolomon {
         }
 
         // Compute error values using Forney's formula
-        let mut errors = vec![0u8; self.n];
+        let mut errors = vec![0u8; n];
         for &j in &error_positions {
             let x = if j == 0 {
                 1

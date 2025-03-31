@@ -4,10 +4,8 @@ use crate::{DecodeError, EncodeError, ReedSolomon};
 /// # Errors
 /// - `RSConstructorError` is returned if `len(message) + 2 * parity` > `255`.
 /// - `RSEncodeError` is returned if encoding fails for any reason.
-pub fn encode(message: &[u8], parity: usize) -> Result<Vec<u8>, EncodeError> {
-    let k = message.len();
-    let n = k + (parity << 1);
-    let rs = ReedSolomon::new(n, k)?;
+pub fn encode(message: &[u8], parity: u8) -> Result<Vec<u8>, EncodeError> {
+    let rs = ReedSolomon::new(parity)?;
 
     Ok(rs.encode(message)?)
 }
@@ -16,7 +14,7 @@ pub fn encode(message: &[u8], parity: usize) -> Result<Vec<u8>, EncodeError> {
 /// # Errors
 /// - `InputTooLarge` is returned if `len(received)` > 255 bytes.
 /// - `InsufficientParityBytes` is returned if `parity > length / 2`.
-/// - `RSEDeodeError` is returned if decoding fails for any reason.
+/// - `RSDecodeError` is returned if decoding fails for any reason.
 pub fn decode(received: &[u8], parity: u8) -> Result<Vec<u8>, DecodeError> {
     let length = received.len();
     let length: u8 = length
@@ -27,9 +25,7 @@ pub fn decode(received: &[u8], parity: u8) -> Result<Vec<u8>, DecodeError> {
         return Err(DecodeError::InsufficientParityBytes(parity, length));
     }
 
-    let n = usize::from(length);
-    let k = n - usize::from(parity << 1);
-    let rs = ReedSolomon::new(n, k)?;
+    let rs = ReedSolomon::new(parity)?;
 
     Ok(rs.decode(received)?)
 }
