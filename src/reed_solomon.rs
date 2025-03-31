@@ -34,10 +34,10 @@ impl ReedSolomon {
         self.parity() << 1
     }
 
-    /// Encodes a message into a codeword.
+    /// Generates parity bytes.
     /// # Errors
     /// - `PolynomialError` if generator polynomial is zero (shouldn't happen)
-    pub fn encode(&self, message: &[u8]) -> Result<Vec<u8>, RSEncodeError> {
+    pub fn generate_parity(&self, message: &[u8]) -> Result<Vec<u8>, PolynomialError> {
         let num_parity = usize::from(self.parity_bytes());
         let g = generate_generator_poly(num_parity);
         let dividend = vec![0u8; num_parity]
@@ -48,6 +48,14 @@ impl ReedSolomon {
         while r.len() < num_parity {
             r.push(0);
         }
+        Ok(r)
+    }
+
+    /// Encodes a message into a codeword.
+    /// # Errors
+    /// - `PolynomialError` if generator polynomial is zero (shouldn't happen)
+    pub fn encode(&self, message: &[u8]) -> Result<Vec<u8>, RSEncodeError> {
+        let mut r = self.generate_parity(message)?;
         r.extend_from_slice(message);
         Ok(r)
     }
