@@ -24,6 +24,17 @@ pub fn poly_eval(poly: &[u8], x: u8) -> u8 {
     result
 }
 
+pub fn poly_eval_segregated(left: &[u8], right: &[u8], x: u8) -> u8 {
+    let mut result = 0u8;
+    for &coef in right.iter().rev() {
+        result = add(mul(result, x), coef);
+    }
+    for &coef in left.iter().rev() {
+        result = add(mul(result, x), coef);
+    }
+    result
+}
+
 /// Computes the remainder of polynomial division.
 pub fn poly_rem(dividend: &[u8], divisor: &[u8]) -> Result<Vec<u8>, PolynomialError> {
     use PolynomialError::ZeroDivisor;

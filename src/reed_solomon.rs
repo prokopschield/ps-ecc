@@ -1,6 +1,8 @@
 use crate::error::{PolynomialError, RSConstructorError, RSDecodeError, RSEncodeError};
 use crate::finite_field::{add, div, inv, mul, ANTILOG_TABLE};
-use crate::polynomial::{poly_div, poly_eval, poly_eval_deriv, poly_mul, poly_rem};
+use crate::polynomial::{
+    poly_div, poly_eval, poly_eval_deriv, poly_eval_segregated, poly_mul, poly_rem,
+};
 
 pub struct ReedSolomon {
     parity: u8,
@@ -67,6 +69,20 @@ impl ReedSolomon {
 
         let syndromes: Vec<u8> = (0..num_parity_bytes)
             .map(|i| poly_eval(received, ANTILOG_TABLE[i + 1]))
+            .collect();
+
+        if syndromes.iter().all(|&s| s == 0) {
+            RSValidationResult::Valid
+        } else {
+            RSValidationResult::Invalid(syndromes)
+        }
+    }
+
+    /// Validates a regregated (parity, message) pair.
+    #[must_use]
+    pub fn validate_segregated(parity: &[u8], data: &[u8]) -> RSValidationResult {
+        let syndromes: Vec<u8> = (0..parity.len())
+            .map(|i| poly_eval_segregated(parity, data, ANTILOG_TABLE[i + 1]))
             .collect();
 
         if syndromes.iter().all(|&s| s == 0) {
