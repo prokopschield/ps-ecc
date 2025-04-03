@@ -60,6 +60,22 @@ impl ReedSolomon {
         Ok(r)
     }
 
+    /// Validates a received codeword.
+    #[must_use]
+    pub fn validate(&self, received: &[u8]) -> RSValidationResult {
+        let num_parity_bytes = usize::from(self.parity_bytes());
+
+        let syndromes: Vec<u8> = (0..num_parity_bytes)
+            .map(|i| poly_eval(received, ANTILOG_TABLE[i + 1]))
+            .collect();
+
+        if syndromes.iter().all(|&s| s == 0) {
+            RSValidationResult::Valid
+        } else {
+            RSValidationResult::Invalid(syndromes)
+        }
+    }
+
     /// Decodes a received codeword, correcting errors if possible.
     /// # Errors
     /// - `GFError` if an arithmetic operation fails
@@ -68,19 +84,17 @@ impl ReedSolomon {
     /// - `ZeroDerivative` shouldn't happen
     pub fn decode(&self, received: &[u8]) -> Result<Vec<u8>, RSDecodeError> {
         use RSDecodeError::{TooManyErrors, ZeroDerivative};
+        use RSValidationResult::{Invalid, Valid};
 
         let num_parity = usize::from(self.parity_bytes());
         let t = usize::from(self.parity());
         let n = received.len();
 
         // Compute syndromes
-        let mut syndromes = vec![0u8; num_parity];
-        for i in 0..num_parity {
-            syndromes[i] = poly_eval(received, ANTILOG_TABLE[i + 1]);
-        }
-        if syndromes.iter().all(|&s| s == 0) {
-            return Ok(received[num_parity..].to_vec());
-        }
+        let syndromes = match self.validate(received) {
+            Valid => return Ok(received[num_parity..].to_vec()),
+            Invalid(syndromes) => syndromes,
+        };
 
         // Euclidean algorithm to find error locator and evaluator polynomials
         let (mut sigma, mut omega) = euclidean_for_rs(&syndromes, t)?;
@@ -180,4 +194,11 @@ fn trim_leading_zeros(poly: &mut Vec<u8>) {
     while poly.len() > 1 && poly.last() == Some(&0) {
         poly.pop();
     }
+}
+
+pub enum RSValidationResult {
+    /// Received string is correct.
+    Valid,
+    /// Received string is incorrect with these syndromes.
+    Invalid(Vec<u8>),
 }
