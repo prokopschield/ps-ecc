@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use crate::error::{PolynomialError, RSConstructorError, RSDecodeError, RSEncodeError};
 use crate::finite_field::{add, div, inv, mul, ANTILOG_TABLE};
 use crate::polynomial::{
@@ -142,6 +144,30 @@ impl ReedSolomon {
         }
 
         Ok(errors)
+    }
+
+    /// Corrects a received codeword, returning the corrected codeword.
+    /// # Errors
+    /// - [`RSDecodeError`] is propagated from [`ReedSolomon::compute_errors`].
+    pub fn correct<'a>(&self, received: &'a [u8]) -> Result<Cow<'a, [u8]>, RSDecodeError> {
+        use RSValidationResult::{Invalid, Valid};
+
+        // Compute syndromes
+        let syndromes = match self.validate(received) {
+            Valid => return Ok(Cow::Borrowed(received)),
+            Invalid(syndromes) => syndromes,
+        };
+
+        let errors = self.compute_errors(received, &syndromes)?;
+
+        // Correct the received codeword
+        let corrected = received
+            .iter()
+            .zip(errors.iter())
+            .map(|(&r, &e)| add(r, e))
+            .collect::<Vec<u8>>();
+
+        Ok(corrected.into())
     }
 
     /// Decodes a received codeword, correcting errors if possible.
