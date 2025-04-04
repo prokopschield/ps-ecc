@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use crate::{DecodeError, EncodeError, ReedSolomon};
 
 /// Encodes a message by prepending an error-correcting code.
@@ -15,7 +17,7 @@ pub fn encode(message: &[u8], parity: u8) -> Result<Vec<u8>, EncodeError> {
 /// - `InputTooLarge` is returned if `len(received)` > 255 bytes.
 /// - `InsufficientParityBytes` is returned if `parity > length / 2`.
 /// - `RSDecodeError` is returned if decoding fails for any reason.
-pub fn decode(received: &[u8], parity: u8) -> Result<Vec<u8>, DecodeError> {
+pub fn decode(received: &[u8], parity: u8) -> Result<Cow<'_, [u8]>, DecodeError> {
     let length = received.len();
     let length: u8 = length
         .try_into()
@@ -46,7 +48,7 @@ mod tests {
             encoded[index] ^= (i * index + 13).to_le_bytes()[0];
             let decoded = decode(&encoded, 13)?;
 
-            assert_eq!(test_str, decoded);
+            assert_eq!(test_str, &decoded[..]);
         }
 
         Ok(())

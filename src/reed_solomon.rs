@@ -173,14 +173,14 @@ impl ReedSolomon {
     /// Decodes a received codeword, correcting errors if possible.
     /// # Errors
     /// - [`RSDecodeError`] is propagated from [`ReedSolomon::compute_errors`].
-    pub fn decode(&self, received: &[u8]) -> Result<Vec<u8>, RSDecodeError> {
+    pub fn decode<'a>(&self, received: &'a [u8]) -> Result<Cow<'a, [u8]>, RSDecodeError> {
         use RSValidationResult::{Invalid, Valid};
 
         let num_parity = usize::from(self.parity_bytes());
 
         // Compute syndromes
         let syndromes = match self.validate(received) {
-            Valid => return Ok(received[num_parity..].to_vec()),
+            Valid => return Ok(received[num_parity..].into()),
             Invalid(syndromes) => syndromes,
         };
 
@@ -193,7 +193,7 @@ impl ReedSolomon {
             .zip(errors.iter().skip(num_parity))
             .map(|(&r, &e)| add(r, e))
             .collect::<Vec<u8>>();
-        Ok(corrected)
+        Ok(corrected.into())
     }
 }
 
