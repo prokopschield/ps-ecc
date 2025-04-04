@@ -24,7 +24,7 @@ pub fn poly_eval(poly: &[u8], x: u8) -> u8 {
     result
 }
 
-pub fn poly_eval_segregated(left: &[u8], right: &[u8], x: u8) -> u8 {
+pub fn poly_eval_detached(left: &[u8], right: &[u8], x: u8) -> u8 {
     let mut result = 0u8;
     for &coef in right.iter().rev() {
         result = add(mul(result, x), coef);

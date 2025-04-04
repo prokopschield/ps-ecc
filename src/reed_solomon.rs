@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use crate::error::{PolynomialError, RSConstructorError, RSDecodeError, RSEncodeError};
 use crate::finite_field::{add, div, inv, mul, ANTILOG_TABLE};
 use crate::polynomial::{
-    poly_div, poly_eval, poly_eval_deriv, poly_eval_segregated, poly_mul, poly_rem,
+    poly_div, poly_eval, poly_eval_deriv, poly_eval_detached, poly_mul, poly_rem,
 };
 
 pub struct ReedSolomon {
@@ -82,9 +82,9 @@ impl ReedSolomon {
 
     /// Validates a regregated (parity, message) pair.
     #[must_use]
-    pub fn validate_segregated(parity: &[u8], data: &[u8]) -> RSValidationResult {
+    pub fn validate_detached(parity: &[u8], data: &[u8]) -> RSValidationResult {
         let syndromes: Vec<u8> = (0..parity.len())
-            .map(|i| poly_eval_segregated(parity, data, ANTILOG_TABLE[i + 1]))
+            .map(|i| poly_eval_detached(parity, data, ANTILOG_TABLE[i + 1]))
             .collect();
 
         if syndromes.iter().all(|&s| s == 0) {
