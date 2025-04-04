@@ -92,28 +92,20 @@ impl ReedSolomon {
         }
     }
 
-    /// Decodes a received codeword, correcting errors if possible.
+    /// Computes errors in a received codeword.
     /// # Errors
     /// - `GFError` if an arithmetic operation fails
     /// - `PolynomialError` if `euclidean_for_rs` fails (division by zero)
     /// - `TooManyErrors` if the input is unrecoverable
     /// - `ZeroDerivative` shouldn't happen
-    pub fn decode(&self, received: &[u8]) -> Result<Vec<u8>, RSDecodeError> {
+    fn compute_errors(&self, received: &[u8], syndromes: &[u8]) -> Result<Vec<u8>, RSDecodeError> {
         use RSDecodeError::{TooManyErrors, ZeroDerivative};
-        use RSValidationResult::{Invalid, Valid};
 
-        let num_parity = usize::from(self.parity_bytes());
         let t = usize::from(self.parity());
         let n = received.len();
 
-        // Compute syndromes
-        let syndromes = match self.validate(received) {
-            Valid => return Ok(received[num_parity..].to_vec()),
-            Invalid(syndromes) => syndromes,
-        };
-
         // Euclidean algorithm to find error locator and evaluator polynomials
-        let (mut sigma, mut omega) = euclidean_for_rs(&syndromes, t)?;
+        let (mut sigma, mut omega) = euclidean_for_rs(syndromes, t)?;
         let scale = inv(sigma[0])?;
         sigma = sigma.iter().map(|&x| mul(x, scale)).collect();
         omega = omega.iter().map(|&x| mul(x, scale)).collect();
@@ -148,6 +140,25 @@ impl ReedSolomon {
             }
             errors[j] = div(omega_x, sigma_deriv_x)?;
         }
+
+        Ok(errors)
+    }
+
+    /// Decodes a received codeword, correcting errors if possible.
+    /// # Errors
+    /// - [`RSDecodeError`] is propagated from [`ReedSolomon::compute_errors`].
+    pub fn decode(&self, received: &[u8]) -> Result<Vec<u8>, RSDecodeError> {
+        use RSValidationResult::{Invalid, Valid};
+
+        let num_parity = usize::from(self.parity_bytes());
+
+        // Compute syndromes
+        let syndromes = match self.validate(received) {
+            Valid => return Ok(received[num_parity..].to_vec()),
+            Invalid(syndromes) => syndromes,
+        };
+
+        let errors = self.compute_errors(received, &syndromes)?;
 
         // Correct the received codeword
         let corrected = received
