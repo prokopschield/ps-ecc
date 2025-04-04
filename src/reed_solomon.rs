@@ -95,16 +95,18 @@ impl ReedSolomon {
     }
 
     /// Computes errors in a received codeword.
+    /// # Parameters
+    /// - `length`: full length of codeword, including parity bytes
+    /// - `syndromes`: see [`ReedSolomon::validate`]
     /// # Errors
     /// - `GFError` if an arithmetic operation fails
     /// - `PolynomialError` if `euclidean_for_rs` fails (division by zero)
     /// - `TooManyErrors` if the input is unrecoverable
     /// - `ZeroDerivative` shouldn't happen
-    fn compute_errors(&self, received: &[u8], syndromes: &[u8]) -> Result<Vec<u8>, RSDecodeError> {
+    fn compute_errors(&self, length: usize, syndromes: &[u8]) -> Result<Vec<u8>, RSDecodeError> {
         use RSDecodeError::{TooManyErrors, ZeroDerivative};
 
         let t = usize::from(self.parity());
-        let n = received.len();
 
         // Euclidean algorithm to find error locator and evaluator polynomials
         let (mut sigma, mut omega) = euclidean_for_rs(syndromes, t)?;
@@ -113,7 +115,7 @@ impl ReedSolomon {
         omega = omega.iter().map(|&x| mul(x, scale)).collect();
 
         // Find error positions
-        let error_positions: Vec<usize> = (0..n)
+        let error_positions: Vec<usize> = (0..length)
             .filter(|&m| {
                 let x = if m == 0 {
                     1
@@ -128,7 +130,7 @@ impl ReedSolomon {
         }
 
         // Compute error values using Forney's formula
-        let mut errors = vec![0u8; n];
+        let mut errors = vec![0u8; length];
         for &j in &error_positions {
             let x = if j == 0 {
                 1
@@ -158,7 +160,7 @@ impl ReedSolomon {
             Invalid(syndromes) => syndromes,
         };
 
-        let errors = self.compute_errors(received, &syndromes)?;
+        let errors = self.compute_errors(received.len(), &syndromes)?;
 
         // Correct the received codeword
         let corrected = received
@@ -184,7 +186,7 @@ impl ReedSolomon {
             Invalid(syndromes) => syndromes,
         };
 
-        let errors = self.compute_errors(received, &syndromes)?;
+        let errors = self.compute_errors(received.len(), &syndromes)?;
 
         // Correct the received codeword
         let corrected = received
