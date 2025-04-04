@@ -152,10 +152,11 @@ impl ReedSolomon {
         // Correct the received codeword
         let corrected = received
             .iter()
-            .zip(errors.iter())
+            .skip(num_parity)
+            .zip(errors.iter().skip(num_parity))
             .map(|(&r, &e)| add(r, e))
             .collect::<Vec<u8>>();
-        Ok(corrected[num_parity..].to_vec())
+        Ok(corrected)
     }
 }
 
