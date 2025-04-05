@@ -210,6 +210,35 @@ impl ReedSolomon {
             .collect::<Vec<u8>>();
         Ok(corrected.into())
     }
+
+    /// Corrects a message based on detached parity bytes.
+    /// # Errors
+    /// - [`RSDecodeError`] is propagated from [`ReedSolomon::compute_errors`].
+    pub fn correct_detached<'a>(
+        parity: &[u8],
+        data: &'a [u8],
+    ) -> Result<Cow<'a, [u8]>, RSDecodeError> {
+        use RSValidationResult::{Invalid, Valid};
+
+        let parity_bytes = parity.len();
+        let num_parity = parity_bytes >> 1;
+        let length = parity_bytes + data.len();
+
+        let syndromes = match Self::validate_detached(parity, data) {
+            Valid => return Ok(data.into()),
+            Invalid(syndromes) => syndromes,
+        };
+
+        let errors = Self::compute_errors_detached(num_parity, length, &syndromes)?;
+
+        let corrected = data
+            .iter()
+            .zip(errors.iter().skip(parity_bytes))
+            .map(|(&r, &e)| add(r, e))
+            .collect::<Vec<u8>>();
+
+        Ok(corrected.into())
+    }
 }
 
 /// Generates the generator polynomial `g(x)` = `(x - α^1)(x - α^2)`...`(x - α^num_roots`).
