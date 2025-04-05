@@ -94,6 +94,15 @@ impl ReedSolomon {
         }
     }
 
+    #[inline]
+    pub fn compute_errors(
+        &self,
+        length: usize,
+        syndromes: &[u8],
+    ) -> Result<Vec<u8>, RSDecodeError> {
+        Self::compute_errors_detached(self.parity(), length, syndromes)
+    }
+
     /// Computes errors in a received codeword.
     /// # Parameters
     /// - `length`: full length of codeword, including parity bytes
@@ -103,10 +112,14 @@ impl ReedSolomon {
     /// - `PolynomialError` if `euclidean_for_rs` fails (division by zero)
     /// - `TooManyErrors` if the input is unrecoverable
     /// - `ZeroDerivative` shouldn't happen
-    fn compute_errors(&self, length: usize, syndromes: &[u8]) -> Result<Vec<u8>, RSDecodeError> {
+    fn compute_errors_detached(
+        parity: impl Into<usize>,
+        length: usize,
+        syndromes: &[u8],
+    ) -> Result<Vec<u8>, RSDecodeError> {
         use RSDecodeError::{TooManyErrors, ZeroDerivative};
 
-        let parity = usize::from(self.parity());
+        let parity = parity.into();
 
         // Euclidean algorithm to find error locator and evaluator polynomials
         let (mut sigma, mut omega) = euclidean_for_rs(syndromes, parity)?;
