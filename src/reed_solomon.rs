@@ -106,10 +106,10 @@ impl ReedSolomon {
     fn compute_errors(&self, length: usize, syndromes: &[u8]) -> Result<Vec<u8>, RSDecodeError> {
         use RSDecodeError::{TooManyErrors, ZeroDerivative};
 
-        let t = usize::from(self.parity());
+        let parity = usize::from(self.parity());
 
         // Euclidean algorithm to find error locator and evaluator polynomials
-        let (mut sigma, mut omega) = euclidean_for_rs(syndromes, t)?;
+        let (mut sigma, mut omega) = euclidean_for_rs(syndromes, parity)?;
         let scale = inv(sigma[0])?;
         sigma = sigma.iter().map(|&x| mul(x, scale)).collect();
         omega = omega.iter().map(|&x| mul(x, scale)).collect();
@@ -125,7 +125,7 @@ impl ReedSolomon {
                 poly_eval(&sigma, x) == 0
             })
             .collect();
-        if error_positions.len() > t {
+        if error_positions.len() > parity {
             return Err(TooManyErrors);
         }
 
