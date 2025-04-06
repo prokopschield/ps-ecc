@@ -30,7 +30,7 @@ impl LongEccHeader {
         bytes[12] = self.parity;
         bytes[13] = self.segment_length;
         bytes[14] = self.segment_distance;
-        bytes[15] = self.segment_length;
+        bytes[15] = self.last_segment_length;
 
         bytes
     }
