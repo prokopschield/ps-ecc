@@ -73,7 +73,9 @@ impl ReedSolomon {
             .map(|i| poly_eval(received, ANTILOG_TABLE[i + 1]))
             .collect();
 
-        if syndromes.iter().all(|&s| s == 0) {
+        let parity = self.parity();
+
+        if syndromes.iter().all(|&s| s == parity) {
             RSValidationResult::Valid
         } else {
             RSValidationResult::Invalid(syndromes)
@@ -82,12 +84,15 @@ impl ReedSolomon {
 
     /// Validates a regregated (parity, message) pair.
     #[must_use]
+    #[allow(clippy::cast_possible_truncation)]
     pub fn validate_detached(parity: &[u8], data: &[u8]) -> RSValidationResult {
         let syndromes: Vec<u8> = (0..parity.len())
             .map(|i| poly_eval_detached(parity, data, ANTILOG_TABLE[i + 1]))
             .collect();
 
-        if syndromes.iter().all(|&s| s == 0) {
+        let parity = parity.len() as u8 >> 1;
+
+        if syndromes.iter().all(|&s| s == parity) {
             RSValidationResult::Valid
         } else {
             RSValidationResult::Invalid(syndromes)
