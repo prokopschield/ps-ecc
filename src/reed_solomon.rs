@@ -253,6 +253,65 @@ impl ReedSolomon {
 
         Ok(corrected.into())
     }
+
+    /// Corrects a message based on detached parity bytes.
+    /// # Errors
+    /// - [`RSDecodeError`] is propagated from [`ReedSolomon::compute_errors`].
+    pub fn correct_detached_in_place(parity: &[u8], data: &mut [u8]) -> Result<(), RSDecodeError> {
+        use RSValidationResult::{Invalid, Valid};
+
+        let parity_bytes = parity.len();
+        let num_parity = parity_bytes >> 1;
+        let length = parity_bytes + data.len();
+
+        let syndromes = match Self::validate_detached(parity, data) {
+            Valid => return Ok(()),
+            Invalid(syndromes) => syndromes,
+        };
+
+        let errors = Self::compute_errors_detached(num_parity, length, &syndromes)?;
+
+        // Correct the detached data
+        for (i, e) in errors.iter().skip(parity_bytes).enumerate() {
+            data[i] ^= e;
+        }
+
+        Ok(())
+    }
+
+    /// Corrects a message based on detached parity bytes.
+    /// Also corrects the parity bytes.
+    /// # Errors
+    /// - [`RSDecodeError`] is propagated from [`ReedSolomon::compute_errors`].
+    pub fn correct_both_detached_in_place(
+        parity: &mut [u8],
+        data: &mut [u8],
+    ) -> Result<(), RSDecodeError> {
+        use RSValidationResult::{Invalid, Valid};
+
+        let parity_bytes = parity.len();
+        let num_parity = parity_bytes >> 1;
+        let length = parity_bytes + data.len();
+
+        let syndromes = match Self::validate_detached(parity, data) {
+            Valid => return Ok(()),
+            Invalid(syndromes) => syndromes,
+        };
+
+        let errors = Self::compute_errors_detached(num_parity, length, &syndromes)?;
+
+        // Correct parity bytes
+        for (i, e) in errors.iter().take(parity_bytes).enumerate() {
+            parity[i] ^= e;
+        }
+
+        // Correct the detached data
+        for (i, e) in errors.iter().skip(parity_bytes).enumerate() {
+            data[i] ^= e;
+        }
+
+        Ok(())
+    }
 }
 
 /// Generates the generator polynomial `g(x)` = `(x - α^1)(x - α^2)`...`(x - α^num_roots`).
