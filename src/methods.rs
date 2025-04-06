@@ -1,12 +1,12 @@
-use std::borrow::Cow;
+use ps_buffer::Buffer;
 
-use crate::{DecodeError, EncodeError, ReedSolomon};
+use crate::{cow::Cow, DecodeError, EncodeError, ReedSolomon};
 
 /// Encodes a message by prepending an error-correcting code.
 /// # Errors
 /// - `RSConstructorError` is returned if `len(message) + 2 * parity` > `255`.
 /// - `RSEncodeError` is returned if encoding fails for any reason.
-pub fn encode(message: &[u8], parity: u8) -> Result<Vec<u8>, EncodeError> {
+pub fn encode(message: &[u8], parity: u8) -> Result<Buffer, EncodeError> {
     let rs = ReedSolomon::new(parity)?;
 
     Ok(rs.encode(message)?)
@@ -17,7 +17,7 @@ pub fn encode(message: &[u8], parity: u8) -> Result<Vec<u8>, EncodeError> {
 /// - `InputTooLarge` is returned if `len(received)` > 255 bytes.
 /// - `InsufficientParityBytes` is returned if `parity > length / 2`.
 /// - `RSDecodeError` is returned if decoding fails for any reason.
-pub fn decode(received: &[u8], parity: u8) -> Result<Cow<'_, [u8]>, DecodeError> {
+pub fn decode(received: &[u8], parity: u8) -> Result<Cow, DecodeError> {
     let length = received.len();
     let length: u8 = length
         .try_into()

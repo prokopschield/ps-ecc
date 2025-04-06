@@ -1,3 +1,4 @@
+mod cow;
 mod error;
 mod finite_field;
 mod methods;

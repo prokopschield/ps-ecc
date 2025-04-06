@@ -1,5 +1,6 @@
-use std::borrow::Cow;
+use ps_buffer::Buffer;
 
+use crate::cow::Cow;
 use crate::error::{PolynomialError, RSConstructorError, RSDecodeError, RSEncodeError};
 use crate::finite_field::{add, div, inv, mul, ANTILOG_TABLE};
 use crate::polynomial::{
@@ -57,11 +58,15 @@ impl ReedSolomon {
 
     /// Encodes a message into a codeword.
     /// # Errors
+    /// - [`ps_buffer::BufferError`] is returned if memory allocation fails.
     /// - `PolynomialError` if generator polynomial is zero (shouldn't happen)
-    pub fn encode(&self, message: &[u8]) -> Result<Vec<u8>, RSEncodeError> {
-        let mut r = self.generate_parity(message)?;
-        r.extend_from_slice(message);
-        Ok(r)
+    pub fn encode(&self, message: &[u8]) -> Result<Buffer, RSEncodeError> {
+        let mut buffer = Buffer::with_capacity(message.len() + usize::from(self.parity_bytes()))?;
+
+        buffer.extend_from_slice(&self.generate_parity(message)?)?;
+        buffer.extend_from_slice(message)?;
+
+        Ok(buffer)
     }
 
     /// Validates a received codeword.
@@ -100,11 +105,10 @@ impl ReedSolomon {
     }
 
     #[inline]
-    pub fn compute_errors(
-        &self,
-        length: usize,
-        syndromes: &[u8],
-    ) -> Result<Vec<u8>, RSDecodeError> {
+    /// # Errors
+    /// - [`ps_buffer::BufferError`] is returned if memory allocation fails.
+    /// - [`RSDecodeError::TooManyErrors`] is returned if the input is unrecoverable.
+    pub fn compute_errors(&self, length: usize, syndromes: &[u8]) -> Result<Buffer, RSDecodeError> {
         Self::compute_errors_detached(self.parity(), length, syndromes)
     }
 
@@ -113,6 +117,7 @@ impl ReedSolomon {
     /// - `length`: full length of codeword, including parity bytes
     /// - `syndromes`: see [`ReedSolomon::validate`]
     /// # Errors
+    /// - [`ps_buffer::BufferError`] is returned if memory allocation fails.
     /// - `GFError` if an arithmetic operation fails
     /// - `PolynomialError` if `euclidean_for_rs` fails (division by zero)
     /// - `TooManyErrors` if the input is unrecoverable
@@ -121,7 +126,7 @@ impl ReedSolomon {
         parity: impl Into<usize>,
         length: usize,
         syndromes: &[u8],
-    ) -> Result<Vec<u8>, RSDecodeError> {
+    ) -> Result<Buffer, RSDecodeError> {
         use RSDecodeError::{TooManyErrors, ZeroDerivative};
 
         let parity = parity.into();
@@ -148,7 +153,7 @@ impl ReedSolomon {
         }
 
         // Compute error values using Forney's formula
-        let mut errors = vec![0u8; length];
+        let mut errors = Buffer::alloc(length)?;
         for &j in &error_positions {
             let x = if j == 0 {
                 1
@@ -168,8 +173,9 @@ impl ReedSolomon {
 
     /// Corrects a received codeword, returning the corrected codeword.
     /// # Errors
+    /// - [`ps_buffer::BufferError`] is returned if memory allocation fails.
     /// - [`RSDecodeError`] is propagated from [`ReedSolomon::compute_errors`].
-    pub fn correct<'a>(&self, received: &'a [u8]) -> Result<Cow<'a, [u8]>, RSDecodeError> {
+    pub fn correct<'lt>(&self, received: &'lt [u8]) -> Result<Cow<'lt>, RSDecodeError> {
         use RSValidationResult::{Invalid, Valid};
 
         // Compute syndromes
@@ -181,19 +187,20 @@ impl ReedSolomon {
         let errors = self.compute_errors(received.len(), &syndromes)?;
 
         // Correct the received codeword
-        let corrected = received
-            .iter()
-            .zip(errors.iter())
-            .map(|(&r, &e)| add(r, e))
-            .collect::<Vec<u8>>();
+        let mut corrected = Buffer::from(received)?;
+
+        for (i, e) in errors.iter().enumerate() {
+            corrected[i] ^= e;
+        }
 
         Ok(corrected.into())
     }
 
     /// Decodes a received codeword, correcting errors if possible.
     /// # Errors
+    /// - [`ps_buffer::BufferError`] is returned if memory allocation fails.
     /// - [`RSDecodeError`] is propagated from [`ReedSolomon::compute_errors`].
-    pub fn decode<'a>(&self, received: &'a [u8]) -> Result<Cow<'a, [u8]>, RSDecodeError> {
+    pub fn decode<'lt>(&self, received: &'lt [u8]) -> Result<Cow<'lt>, RSDecodeError> {
         use RSValidationResult::{Invalid, Valid};
 
         let num_parity = usize::from(self.parity_bytes());
@@ -207,22 +214,23 @@ impl ReedSolomon {
         let errors = self.compute_errors(received.len(), &syndromes)?;
 
         // Correct the received codeword
-        let corrected = received
-            .iter()
-            .skip(num_parity)
-            .zip(errors.iter().skip(num_parity))
-            .map(|(&r, &e)| add(r, e))
-            .collect::<Vec<u8>>();
+        let mut corrected = Buffer::from(&received[num_parity..])?;
+
+        for (i, e) in errors.iter().skip(num_parity).enumerate() {
+            corrected[i] ^= e;
+        }
+
         Ok(corrected.into())
     }
 
     /// Corrects a message based on detached parity bytes.
     /// # Errors
+    /// - [`ps_buffer::BufferError`] is returned if memory allocation fails.
     /// - [`RSDecodeError`] is propagated from [`ReedSolomon::compute_errors`].
-    pub fn correct_detached<'a>(
+    pub fn correct_detached<'lt>(
         parity: &[u8],
-        data: &'a [u8],
-    ) -> Result<Cow<'a, [u8]>, RSDecodeError> {
+        data: &'lt [u8],
+    ) -> Result<Cow<'lt>, RSDecodeError> {
         use RSValidationResult::{Invalid, Valid};
 
         let parity_bytes = parity.len();
@@ -236,11 +244,12 @@ impl ReedSolomon {
 
         let errors = Self::compute_errors_detached(num_parity, length, &syndromes)?;
 
-        let corrected = data
-            .iter()
-            .zip(errors.iter().skip(parity_bytes))
-            .map(|(&r, &e)| add(r, e))
-            .collect::<Vec<u8>>();
+        // Correct the received codeword
+        let mut corrected = Buffer::from(data)?;
+
+        for (i, e) in errors.iter().skip(parity_bytes).enumerate() {
+            corrected[i] ^= e;
+        }
 
         Ok(corrected.into())
     }

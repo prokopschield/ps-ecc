@@ -2,6 +2,7 @@
 
 use std::num::TryFromIntError;
 
+use ps_buffer::BufferError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -27,11 +28,15 @@ pub enum RSConstructorError {
 #[derive(Error, Debug)]
 pub enum RSEncodeError {
     #[error(transparent)]
+    BufferError(#[from] BufferError),
+    #[error(transparent)]
     PolynomialError(#[from] PolynomialError),
 }
 
 #[derive(Error, Debug)]
 pub enum RSDecodeError {
+    #[error(transparent)]
+    BufferError(#[from] BufferError),
     #[error(transparent)]
     GFError(#[from] GFError),
     #[error(transparent)]
