@@ -1,12 +1,19 @@
 use ps_buffer::Buffer;
 
-use crate::{cow::Cow, DecodeError, EncodeError, ReedSolomon};
+use crate::{cow::Cow, long, DecodeError, EncodeError, ReedSolomon};
 
-/// Encodes a message by prepending an error-correcting code.
+/// Encodes a message by adding an error-correcting code.
 /// # Errors
 /// - `RSConstructorError` is returned if `len(message) + 2 * parity` > `255`.
 /// - `RSEncodeError` is returned if encoding fails for any reason.
 pub fn encode(message: &[u8], parity: u8) -> Result<Buffer, EncodeError> {
+    if message.len() + (usize::from(parity) << 1) > 0xff {
+        let segment_length = 0xFF - (parity << 1);
+        let codeword = long::encode(message, parity, segment_length, segment_length)?;
+
+        return Ok(codeword);
+    }
+
     let rs = ReedSolomon::new(parity)?;
 
     Ok(rs.encode(message)?)

@@ -1,6 +1,6 @@
 #![allow(clippy::module_name_repetitions)]
 
-use std::num::TryFromIntError;
+use std::{array::TryFromSliceError, num::TryFromIntError};
 
 use ps_buffer::BufferError;
 use thiserror::Error;
@@ -50,6 +50,8 @@ pub enum RSDecodeError {
 #[derive(Error, Debug)]
 pub enum EncodeError {
     #[error(transparent)]
+    LongEccEncodeError(#[from] LongEccEncodeError),
+    #[error(transparent)]
     RSConstructorError(#[from] RSConstructorError),
     #[error(transparent)]
     RSEncodeError(#[from] RSEncodeError),
@@ -74,4 +76,26 @@ pub enum EccError {
     EncodeError(#[from] EncodeError),
     #[error(transparent)]
     DecodeError(#[from] DecodeError),
+}
+
+#[derive(Error, Debug)]
+pub enum LongEccConstructorError {
+    #[error(transparent)]
+    TryFromSliceError(#[from] TryFromSliceError),
+}
+
+#[derive(Error, Debug)]
+pub enum LongEccEncodeError {
+    #[error(transparent)]
+    BufferError(#[from] BufferError),
+    #[error("Parity {0} >= 64, which is too high.")]
+    InvalidParity(u8),
+    #[error("Invalid segment-to-parity ratio: {0} < 2 * {1}")]
+    InvalidSegmentParityRatio(u8, u8),
+    #[error(transparent)]
+    PolynomialError(#[from] PolynomialError),
+    #[error(transparent)]
+    RSConstructorError(#[from] RSConstructorError),
+    #[error(transparent)]
+    TryFromIntError(#[from] TryFromIntError),
 }
