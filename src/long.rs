@@ -15,7 +15,6 @@ const HEADER_SIZE: usize = std::mem::size_of::<LongEccHeader>();
 pub struct LongEccHeader {
     pub full_length: u32,
     pub message_length: u32,
-    pub segment_count: u32,
     pub parity: u8,
     pub segment_length: u8,
     pub segment_distance: u8,
@@ -27,11 +26,10 @@ impl LongEccHeader {
         let header = Self {
             full_length: u32::from_le_bytes(bytes[0..4].try_into()?),
             message_length: u32::from_le_bytes(bytes[4..8].try_into()?),
-            segment_count: u32::from_le_bytes(bytes[8..12].try_into()?),
-            parity: *bytes.get(12).unwrap_or(&0),
-            segment_length: *bytes.get(13).unwrap_or(&0),
-            segment_distance: *bytes.get(14).unwrap_or(&0),
-            last_segment_length: *bytes.get(15).unwrap_or(&0),
+            parity: *bytes.get(8).unwrap_or(&0),
+            segment_length: *bytes.get(9).unwrap_or(&0),
+            segment_distance: *bytes.get(10).unwrap_or(&0),
+            last_segment_length: *bytes.get(11).unwrap_or(&0),
         };
 
         Ok(header)
@@ -43,11 +41,10 @@ impl LongEccHeader {
 
         bytes[0x0..0x4].copy_from_slice(&self.full_length.to_le_bytes());
         bytes[0x4..0x8].copy_from_slice(&self.message_length.to_le_bytes());
-        bytes[0x8..0xC].copy_from_slice(&self.segment_count.to_le_bytes());
-        bytes[12] = self.parity;
-        bytes[13] = self.segment_length;
-        bytes[14] = self.segment_distance;
-        bytes[15] = self.last_segment_length;
+        bytes[0x8] = self.parity;
+        bytes[0x9] = self.segment_length;
+        bytes[0xA] = self.segment_distance;
+        bytes[0xB] = self.last_segment_length;
 
         bytes
     }
@@ -98,7 +95,6 @@ pub fn encode(
 
     header.full_length = u32::try_from(full_length)?;
     header.last_segment_length = u8::try_from(last_segment_length)?;
-    header.segment_count = u32::try_from(segment_count)?;
 
     let mut codeword = Buffer::with_capacity(full_length)?;
 
