@@ -1,6 +1,6 @@
 use ps_buffer::Buffer;
 
-use crate::{cow::Cow, long, DecodeError, EncodeError, ReedSolomon};
+use crate::{codeword::Codeword, long, DecodeError, EncodeError, ReedSolomon};
 
 /// Encodes a message by adding an error-correcting code.
 /// # Errors
@@ -24,19 +24,18 @@ pub fn encode(message: &[u8], parity: u8) -> Result<Buffer, EncodeError> {
 /// - `InputTooLarge` is returned if `len(received)` > 255 bytes.
 /// - `InsufficientParityBytes` is returned if `parity > length / 2`.
 /// - `RSDecodeError` is returned if decoding fails for any reason.
-pub fn decode(received: &[u8], parity: u8) -> Result<Cow, DecodeError> {
-    let length = received.len();
-    let length: u8 = length
-        .try_into()
-        .or(Err(DecodeError::InputTooLarge(u32::try_from(length)?)))?;
+pub fn decode(received: &[u8], parity: u8) -> Result<Codeword, DecodeError> {
+    if let Ok(length) = u8::try_from(received.len()) {
+        if parity > length >> 1 {
+            return Err(DecodeError::InsufficientParityBytes(parity, length));
+        }
 
-    if parity > length >> 1 {
-        return Err(DecodeError::InsufficientParityBytes(parity, length));
+        let rs = ReedSolomon::new(parity)?;
+
+        Ok(rs.decode(received)?.into())
+    } else {
+        Ok(long::decode(received)?)
     }
-
-    let rs = ReedSolomon::new(parity)?;
-
-    Ok(rs.decode(received)?)
 }
 
 #[cfg(test)]

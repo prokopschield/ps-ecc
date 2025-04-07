@@ -59,16 +59,14 @@ pub enum EncodeError {
 
 #[derive(Error, Debug)]
 pub enum DecodeError {
-    #[error("Input too large, {0} > 255.")]
-    InputTooLarge(u32),
     #[error("Insufficient input bytes for parity count of {0}: {0} * 2 > {1}.")]
     InsufficientParityBytes(u8, u8),
+    #[error(transparent)]
+    LongEccDecodeError(#[from] LongEccDecodeError),
     #[error(transparent)]
     RSConstructorError(#[from] RSConstructorError),
     #[error(transparent)]
     RSDecodeError(#[from] RSDecodeError),
-    #[error(transparent)]
-    TryFromIntError(#[from] TryFromIntError),
 }
 #[derive(Error, Debug)]
 pub enum EccError {
@@ -96,6 +94,24 @@ pub enum LongEccEncodeError {
     PolynomialError(#[from] PolynomialError),
     #[error(transparent)]
     RSConstructorError(#[from] RSConstructorError),
+    #[error(transparent)]
+    TryFromIntError(#[from] TryFromIntError),
+}
+
+#[derive(Error, Debug)]
+pub enum LongEccDecodeError {
+    #[error(transparent)]
+    BufferError(#[from] BufferError),
+    #[error("Codeword is invalid.")]
+    InvalidCodeword,
+    #[error(transparent)]
+    LongEccConstructorError(#[from] LongEccConstructorError),
+    #[error("Failed to read data bytes.")]
+    ReadDataError,
+    #[error("Failed to read parity bytes.")]
+    ReadParityError,
+    #[error(transparent)]
+    RSDecodeError(#[from] RSDecodeError),
     #[error(transparent)]
     TryFromIntError(#[from] TryFromIntError),
 }

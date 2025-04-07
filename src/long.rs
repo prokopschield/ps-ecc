@@ -2,7 +2,10 @@ use std::ops::Add;
 
 use ps_buffer::Buffer;
 
-use crate::{LongEccEncodeError, ReedSolomon};
+use crate::{
+    codeword::Codeword, LongEccConstructorError, LongEccDecodeError, LongEccEncodeError,
+    ReedSolomon,
+};
 
 const HEADER_SIZE: usize = std::mem::size_of::<LongEccHeader>();
 
@@ -20,6 +23,20 @@ pub struct LongEccHeader {
 }
 
 impl LongEccHeader {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, LongEccConstructorError> {
+        let header = Self {
+            full_length: u32::from_le_bytes(bytes[0..4].try_into()?),
+            message_length: u32::from_le_bytes(bytes[4..8].try_into()?),
+            segment_count: u32::from_le_bytes(bytes[8..12].try_into()?),
+            parity: *bytes.get(12).unwrap_or(&0),
+            segment_length: *bytes.get(13).unwrap_or(&0),
+            segment_distance: *bytes.get(14).unwrap_or(&0),
+            last_segment_length: *bytes.get(15).unwrap_or(&0),
+        };
+
+        Ok(header)
+    }
+
     #[inline]
     pub fn to_bytes(self) -> [u8; HEADER_SIZE] {
         let mut bytes = [0u8; HEADER_SIZE];
@@ -107,6 +124,52 @@ pub fn encode(
             break;
         }
     }
+
+    Ok(codeword)
+}
+
+pub fn correct_in_place(codeword: &mut [u8]) -> Result<LongEccHeader, LongEccDecodeError> {
+    use LongEccDecodeError::{ReadDataError, ReadParityError};
+
+    let header = LongEccHeader::from_bytes(codeword)?;
+
+    let parity_bytes = usize::from(header.parity) << 1;
+    let last_segment_length = usize::from(header.last_segment_length);
+    let segment_length = usize::from(header.segment_length);
+    let segment_distance = usize::from(header.segment_distance);
+
+    let mut parity_index = codeword.len().saturating_sub(parity_bytes);
+    let mut data_index = parity_index.saturating_sub(last_segment_length);
+
+    // last chunk
+    let (md, mp) = codeword[data_index..].split_at_mut(last_segment_length);
+    ReedSolomon::correct_both_detached_in_place(md, mp)?;
+
+    while data_index > 0 {
+        data_index = data_index.saturating_sub(segment_distance);
+        parity_index = parity_index.saturating_sub(parity_bytes);
+
+        let data_range = data_index..data_index + segment_length;
+        let parity_range = ..parity_bytes;
+
+        let (data, parity) = codeword.split_at_mut(parity_index);
+
+        let parity = parity.get_mut(parity_range).ok_or(ReadParityError)?;
+        let data = data.get_mut(data_range).ok_or(ReadDataError)?;
+
+        ReedSolomon::correct_both_detached_in_place(parity, data)?;
+    }
+
+    Ok(header)
+}
+
+pub fn decode(codeword: &[u8]) -> Result<Codeword, LongEccDecodeError> {
+    let mut buffer = Buffer::from(codeword)?;
+    let header = correct_in_place(&mut buffer)?;
+    let codeword = Codeword {
+        codeword: buffer.into(),
+        range: HEADER_SIZE..HEADER_SIZE + usize::try_from(header.message_length)?,
+    };
 
     Ok(codeword)
 }
