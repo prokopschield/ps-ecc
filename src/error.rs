@@ -26,11 +26,17 @@ pub enum RSConstructorError {
 }
 
 #[derive(Error, Debug)]
+pub enum RSGenerateParityError {
+    #[error(transparent)]
+    PolynomialError(#[from] PolynomialError),
+}
+
+#[derive(Error, Debug)]
 pub enum RSEncodeError {
     #[error(transparent)]
     BufferError(#[from] BufferError),
     #[error(transparent)]
-    PolynomialError(#[from] PolynomialError),
+    RSGenerateParityError(#[from] RSGenerateParityError),
 }
 
 #[derive(Error, Debug)]
@@ -91,9 +97,9 @@ pub enum LongEccEncodeError {
     #[error("Invalid segment-to-parity ratio: {0} < 2 * {1}")]
     InvalidSegmentParityRatio(u8, u8),
     #[error(transparent)]
-    PolynomialError(#[from] PolynomialError),
-    #[error(transparent)]
     RSConstructorError(#[from] RSConstructorError),
+    #[error(transparent)]
+    RSGenerateParityError(#[from] RSGenerateParityError),
     #[error(transparent)]
     TryFromIntError(#[from] TryFromIntError),
 }

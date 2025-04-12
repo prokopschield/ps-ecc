@@ -1,7 +1,9 @@
 use ps_buffer::Buffer;
 
 use crate::cow::Cow;
-use crate::error::{PolynomialError, RSConstructorError, RSDecodeError, RSEncodeError};
+use crate::error::{
+    PolynomialError, RSConstructorError, RSDecodeError, RSEncodeError, RSGenerateParityError,
+};
 use crate::finite_field::{add, div, inv, mul, ANTILOG_TABLE};
 use crate::polynomial::{
     poly_div, poly_eval, poly_eval_deriv, poly_eval_detached, poly_mul, poly_rem,
@@ -42,7 +44,7 @@ impl ReedSolomon {
     /// Generates parity bytes.
     /// # Errors
     /// - `PolynomialError` if generator polynomial is zero (shouldn't happen)
-    pub fn generate_parity(&self, message: &[u8]) -> Result<Vec<u8>, PolynomialError> {
+    pub fn generate_parity(&self, message: &[u8]) -> Result<Vec<u8>, RSGenerateParityError> {
         let num_parity = usize::from(self.parity_bytes());
         let g = generate_generator_poly(num_parity);
         let dividend = vec![0u8; num_parity]
