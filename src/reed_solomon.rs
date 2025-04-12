@@ -78,9 +78,7 @@ impl ReedSolomon {
             .map(|i| poly_eval(received, ANTILOG_TABLE[i + 1]))
             .collect();
 
-        let parity = self.parity();
-
-        if syndromes.iter().all(|&s| s == parity) {
+        if syndromes.iter().all(|&s| s == 0) {
             RSValidationResult::Valid
         } else {
             RSValidationResult::Invalid(syndromes)
@@ -95,9 +93,7 @@ impl ReedSolomon {
             .map(|i| poly_eval_detached(parity, data, ANTILOG_TABLE[i + 1]))
             .collect();
 
-        let parity = parity.len() as u8 >> 1;
-
-        if syndromes.iter().all(|&s| s == parity) {
+        if syndromes.iter().all(|&s| s == 0) {
             RSValidationResult::Valid
         } else {
             RSValidationResult::Invalid(syndromes)
