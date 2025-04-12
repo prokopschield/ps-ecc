@@ -160,7 +160,7 @@ pub fn correct_in_place(codeword: &mut [u8]) -> Result<LongEccHeader, LongEccDec
 }
 
 pub fn decode(codeword: &[u8]) -> Result<Codeword, LongEccDecodeError> {
-    let mut buffer = Buffer::from(codeword)?;
+    let mut buffer = Buffer::from_slice(codeword)?;
     let header = correct_in_place(&mut buffer)?;
     let codeword = Codeword {
         codeword: buffer.into(),

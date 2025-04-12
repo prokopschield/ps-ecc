@@ -10,7 +10,7 @@ pub enum Cow<'lt> {
 impl<'lt> Cow<'lt> {
     pub fn try_into_buffer(self) -> Result<Buffer, BufferError> {
         match self {
-            Cow::Borrowed(value) => Buffer::from(value),
+            Cow::Borrowed(value) => Buffer::from_slice(value),
             Cow::Owned(value) => Ok(value),
         }
     }

@@ -183,7 +183,7 @@ impl ReedSolomon {
         let errors = self.compute_errors(received.len(), &syndromes)?;
 
         // Correct the received codeword
-        let mut corrected = Buffer::from(received)?;
+        let mut corrected = Buffer::from_slice(received)?;
 
         for (i, e) in errors.iter().enumerate() {
             corrected[i] ^= e;
@@ -210,7 +210,7 @@ impl ReedSolomon {
         let errors = self.compute_errors(received.len(), &syndromes)?;
 
         // Correct the received codeword
-        let mut corrected = Buffer::from(&received[num_parity..])?;
+        let mut corrected = Buffer::from_slice(&received[num_parity..])?;
 
         for (i, e) in errors.iter().skip(num_parity).enumerate() {
             corrected[i] ^= e;
@@ -241,7 +241,7 @@ impl ReedSolomon {
         let errors = Self::compute_errors_detached(num_parity, length, &syndromes)?;
 
         // Correct the received codeword
-        let mut corrected = Buffer::from(data)?;
+        let mut corrected = Buffer::from_slice(data)?;
 
         for (i, e) in errors.iter().skip(parity_bytes).enumerate() {
             corrected[i] ^= e;
