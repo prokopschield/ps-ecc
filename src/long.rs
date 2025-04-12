@@ -139,7 +139,7 @@ pub fn correct_in_place(codeword: &mut [u8]) -> Result<LongEccHeader, LongEccDec
 
     // last chunk
     let (md, mp) = codeword[data_index..].split_at_mut(last_segment_length);
-    ReedSolomon::correct_both_detached_in_place(md, mp)?;
+    ReedSolomon::correct_both_detached_in_place(mp, md)?;
 
     while data_index > 0 {
         data_index = data_index.saturating_sub(segment_distance);
