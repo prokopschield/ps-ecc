@@ -10,6 +10,7 @@ pub struct Codeword<'lt> {
 }
 
 impl<'lt> Codeword<'lt> {
+    #[must_use]
     pub fn into_inner(self) -> Cow<'lt> {
         self.codeword
     }
