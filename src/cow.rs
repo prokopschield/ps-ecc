@@ -8,6 +8,11 @@ pub enum Cow<'lt> {
 }
 
 impl<'lt> Cow<'lt> {
+    /// This method turns this [`Cow`] into a [`Buffer`].
+    /// - In the case of [`Cow::Borrowed`], a new [`Buffer`] is allocated.
+    /// - In the case of [`Cow::Owned`], the existing [`Buffer`] is returned.
+    /// # Errors
+    /// [`BufferError`] is returned if an allocation error occurs.
     pub fn try_into_buffer(self) -> Result<Buffer, BufferError> {
         match self {
             Cow::Borrowed(value) => Buffer::from_slice(value),
