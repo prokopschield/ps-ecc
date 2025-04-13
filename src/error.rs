@@ -5,13 +5,13 @@ use std::{array::TryFromSliceError, num::TryFromIntError};
 use ps_buffer::BufferError;
 use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum GFError {
     #[error("Division by zero is undefined.")]
     DivByZero,
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum PolynomialError {
     #[error(transparent)]
     GFError(#[from] GFError),
@@ -19,19 +19,19 @@ pub enum PolynomialError {
     ZeroDivisor,
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum RSConstructorError {
     #[error("Parity count must be <= 127.")]
     ParityTooHigh,
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum RSGenerateParityError {
     #[error(transparent)]
     PolynomialError(#[from] PolynomialError),
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum RSEncodeError {
     #[error(transparent)]
     BufferError(#[from] BufferError),
@@ -39,7 +39,7 @@ pub enum RSEncodeError {
     RSGenerateParityError(#[from] RSGenerateParityError),
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum RSDecodeError {
     #[error(transparent)]
     BufferError(#[from] BufferError),
@@ -53,7 +53,7 @@ pub enum RSDecodeError {
     ZeroDerivative,
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum EncodeError {
     #[error(transparent)]
     LongEccEncodeError(#[from] LongEccEncodeError),
@@ -63,7 +63,7 @@ pub enum EncodeError {
     RSEncodeError(#[from] RSEncodeError),
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone)]
 pub enum DecodeError {
     #[error("Insufficient input bytes for parity count of {0}: {0} * 2 > {1}.")]
     InsufficientParityBytes(u8, u8),
@@ -74,7 +74,7 @@ pub enum DecodeError {
     #[error(transparent)]
     RSDecodeError(#[from] RSDecodeError),
 }
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone)]
 pub enum EccError {
     #[error(transparent)]
     EncodeError(#[from] EncodeError),
@@ -82,13 +82,13 @@ pub enum EccError {
     DecodeError(#[from] DecodeError),
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone, Copy)]
 pub enum LongEccConstructorError {
     #[error(transparent)]
     TryFromSliceError(#[from] TryFromSliceError),
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum LongEccEncodeError {
     #[error(transparent)]
     BufferError(#[from] BufferError),
@@ -104,7 +104,7 @@ pub enum LongEccEncodeError {
     TryFromIntError(#[from] TryFromIntError),
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone)]
 pub enum LongEccDecodeError {
     #[error(transparent)]
     BufferError(#[from] BufferError),

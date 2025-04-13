@@ -2,6 +2,7 @@ use std::ops::Deref;
 
 use ps_buffer::{Buffer, BufferError};
 
+#[derive(Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Cow<'lt> {
     Borrowed(&'lt [u8]),
     Owned(Buffer),
