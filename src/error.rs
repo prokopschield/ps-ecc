@@ -11,8 +11,10 @@ pub enum GFError {
     DivByZero,
 }
 
-#[derive(Error, Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum PolynomialError {
+    #[error(transparent)]
+    BufferError(#[from] BufferError),
     #[error(transparent)]
     GFError(#[from] GFError),
     #[error("Divisor cannot be zero.")]
@@ -25,8 +27,10 @@ pub enum RSConstructorError {
     ParityTooHigh,
 }
 
-#[derive(Error, Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum RSGenerateParityError {
+    #[error(transparent)]
+    BufferError(#[from] BufferError),
     #[error(transparent)]
     PolynomialError(#[from] PolynomialError),
 }

@@ -1,18 +1,20 @@
+use ps_buffer::{Buffer, ToBuffer};
+
 use crate::{
     error::PolynomialError,
     finite_field::{add, div, mul},
 };
 
 /// Multiplies two polynomials.
-pub fn poly_mul(p1: &[u8], p2: &[u8]) -> Vec<u8> {
-    let mut result = vec![0u8; p1.len() + p2.len() - 1];
+pub fn poly_mul(p1: &[u8], p2: &[u8]) -> Result<Buffer, PolynomialError> {
+    let mut result = Buffer::alloc(p1.len() + p2.len() - 1)?;
     for i in 0..p1.len() {
         for j in 0..p2.len() {
             result[i + j] = add(result[i + j], mul(p1[i], p2[j]));
         }
     }
     trim_leading_zeros(&mut result);
-    result
+    Ok(result)
 }
 
 /// Evaluates a polynomial at a given point.
@@ -36,9 +38,9 @@ pub fn poly_eval_detached(left: &[u8], right: &[u8], x: u8) -> u8 {
 }
 
 /// Computes the remainder of polynomial division.
-pub fn poly_rem(dividend: &[u8], divisor: &[u8]) -> Result<Vec<u8>, PolynomialError> {
+pub fn poly_rem(dividend: &[u8], divisor: &[u8]) -> Result<Buffer, PolynomialError> {
     use PolynomialError::ZeroDivisor;
-    let mut rem = dividend.to_vec();
+    let mut rem = dividend.to_buffer()?;
     let divisor_deg = degree(divisor).ok_or(ZeroDivisor)?;
     while let Some(deg) = degree(&rem) {
         if deg < divisor_deg {
@@ -58,12 +60,12 @@ pub fn poly_rem(dividend: &[u8], divisor: &[u8]) -> Result<Vec<u8>, PolynomialEr
 }
 
 /// Polynomial division returning quotient and remainder.
-pub fn poly_div(dividend: &[u8], divisor: &[u8]) -> Result<(Vec<u8>, Vec<u8>), PolynomialError> {
+pub fn poly_div(dividend: &[u8], divisor: &[u8]) -> Result<(Buffer, Buffer), PolynomialError> {
     use PolynomialError::ZeroDivisor;
     let divisor_deg = degree(divisor).ok_or(ZeroDivisor)?;
     let divisor_lc = divisor[divisor_deg];
-    let mut quot = vec![0u8; dividend.len().saturating_sub(divisor.len()) + 1];
-    let mut rem = dividend.to_vec();
+    let mut quot = Buffer::alloc(dividend.len().saturating_sub(divisor.len()) + 1)?;
+    let mut rem = dividend.to_buffer()?;
     while let Some(deg) = degree(&rem) {
         if deg < divisor_deg {
             break;
@@ -101,16 +103,16 @@ pub fn poly_eval_deriv(poly: &[u8], x: u8) -> u8 {
 
 /// Subtracts two polynomials (same as addition in GF(2)).
 #[allow(clippy::needless_range_loop)]
-pub fn poly_sub(p1: &[u8], p2: &[u8]) -> Vec<u8> {
+pub fn poly_sub(p1: &[u8], p2: &[u8]) -> Result<Buffer, PolynomialError> {
     let len = p1.len().max(p2.len());
-    let mut result = vec![0u8; len];
+    let mut result = Buffer::alloc(len)?;
     for i in 0..len {
         let a = p1.get(i).copied().unwrap_or(0);
         let b = p2.get(i).copied().unwrap_or(0);
         result[i] = add(a, b);
     }
     trim_leading_zeros(&mut result);
-    result
+    Ok(result)
 }
 
 /// Computes the degree of a polynomial.
@@ -119,8 +121,6 @@ fn degree(poly: &[u8]) -> Option<usize> {
 }
 
 /// Removes leading zeros from a polynomial.
-fn trim_leading_zeros(poly: &mut Vec<u8>) {
-    while poly.len() > 1 && poly.last() == Some(&0) {
-        poly.pop();
-    }
+fn trim_leading_zeros(poly: &mut Buffer) {
+    poly.truncate(degree(poly).unwrap_or(1).saturating_add(1));
 }

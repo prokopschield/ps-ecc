@@ -1,4 +1,4 @@
-use ps_buffer::{Buffer, ToBuffer};
+use ps_buffer::{Buffer, ByteIteratorIntoBuffer, ToBuffer};
 
 use crate::cow::Cow;
 use crate::error::{
@@ -43,17 +43,18 @@ impl ReedSolomon {
 
     /// Generates parity bytes.
     /// # Errors
+    /// - `BufferError` if an allocation fails
     /// - `PolynomialError` if generator polynomial is zero (shouldn't happen)
-    pub fn generate_parity(&self, message: &[u8]) -> Result<Vec<u8>, RSGenerateParityError> {
+    pub fn generate_parity(&self, message: &[u8]) -> Result<Buffer, RSGenerateParityError> {
         let num_parity = usize::from(self.parity_bytes());
-        let g = generate_generator_poly(num_parity);
+        let g = generate_generator_poly(num_parity)?;
         let dividend = vec![0u8; num_parity]
             .into_iter()
             .chain(message.iter().copied())
             .collect::<Vec<u8>>();
         let mut r = poly_rem(&dividend, &g)?;
-        while r.len() < num_parity {
-            r.push(0);
+        if r.len() != num_parity {
+            r.resize(num_parity, 0)?;
         }
         Ok(r)
     }
@@ -132,8 +133,8 @@ impl ReedSolomon {
         // Euclidean algorithm to find error locator and evaluator polynomials
         let (mut sigma, mut omega) = euclidean_for_rs(syndromes, parity)?;
         let scale = inv(sigma[0])?;
-        sigma = sigma.iter().map(|&x| mul(x, scale)).collect();
-        omega = omega.iter().map(|&x| mul(x, scale)).collect();
+        sigma = sigma.iter().map(|&x| mul(x, scale)).into_buffer()?;
+        omega = omega.iter().map(|&x| mul(x, scale)).into_buffer()?;
 
         // Find error positions
         let error_positions: Vec<usize> = (0..length)
@@ -297,25 +298,25 @@ impl ReedSolomon {
 
 /// Generates the generator polynomial `g(x)` = `(x - α^1)(x - α^2)`...`(x - α^num_roots`).
 #[allow(clippy::needless_range_loop)]
-fn generate_generator_poly(num_roots: usize) -> Vec<u8> {
-    let mut g = vec![1u8];
+fn generate_generator_poly(num_roots: usize) -> Result<Buffer, PolynomialError> {
+    let mut g = Buffer::from_slice([1])?;
     for i in 1..=num_roots {
         let root = ANTILOG_TABLE[i];
-        g = poly_mul(&g, &[root, 1]); // x + α^i
+        g = poly_mul(&g, &[root, 1])?; // x + α^i
     }
-    g
+    Ok(g)
 }
 
 /// Extended Euclidean algorithm for Reed-Solomon decoding.
-fn euclidean_for_rs(s: &[u8], t: usize) -> Result<(Vec<u8>, Vec<u8>), PolynomialError> {
-    let mut r0 = vec![0u8; 2 * t + 1];
+fn euclidean_for_rs(s: &[u8], t: usize) -> Result<(Buffer, Buffer), PolynomialError> {
+    let mut r0 = Buffer::alloc(2 * t + 1)?;
     r0[2 * t] = 1; // x^{2t}
-    let mut r1 = s.to_vec();
-    let mut t0 = vec![0u8];
-    let mut t1 = vec![1u8];
+    let mut r1 = s.to_buffer()?;
+    let mut t0 = Buffer::from_slice([0])?;
+    let mut t1 = Buffer::from_slice([1])?;
     while degree(&r1).unwrap_or(0) >= t {
         let (q, r) = poly_div(&r0, &r1)?;
-        let new_t1 = poly_sub(&t0, &poly_mul(&q, &t1));
+        let new_t1 = poly_sub(&t0, &poly_mul(&q, &t1)?)?;
         t0 = t1;
         t1 = new_t1;
         r0 = r1;
