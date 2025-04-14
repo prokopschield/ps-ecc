@@ -188,9 +188,7 @@ impl ReedSolomon {
         // Correct the received codeword
         let mut corrected = Buffer::from_slice(received)?;
 
-        for (i, e) in errors.iter().enumerate() {
-            corrected[i] ^= e;
-        }
+        Self::apply_corrections(&mut corrected, &errors);
 
         Ok(corrected.into())
     }
@@ -215,9 +213,7 @@ impl ReedSolomon {
         // Correct the received codeword
         let mut corrected = Buffer::from_slice(&received[num_parity..])?;
 
-        for (i, e) in errors.iter().skip(num_parity).enumerate() {
-            corrected[i] ^= e;
-        }
+        Self::apply_corrections(&mut corrected, &errors[num_parity..]);
 
         Ok(corrected.into())
     }
@@ -246,9 +242,7 @@ impl ReedSolomon {
         // Correct the received codeword
         let mut corrected = Buffer::from_slice(data)?;
 
-        for (i, e) in errors.iter().skip(parity_bytes).enumerate() {
-            corrected[i] ^= e;
-        }
+        Self::apply_corrections(&mut corrected, &errors[parity_bytes..]);
 
         Ok(corrected.into())
     }
@@ -282,17 +276,26 @@ impl ReedSolomon {
 
         let errors = Self::compute_errors_detached(num_parity, length, &syndromes)?;
 
-        // Correct parity bytes
-        for (i, e) in errors.iter().take(parity_bytes).enumerate() {
-            parity[i] ^= e;
-        }
-
-        // Correct the detached data
-        for (i, e) in errors.iter().skip(parity_bytes).enumerate() {
-            data[i] ^= e;
-        }
+        Self::apply_corrections_detached(parity, data, &errors);
 
         Ok(())
+    }
+
+    pub fn apply_corrections(target: &mut [u8], corrections: impl AsRef<[u8]>) {
+        target
+            .iter_mut()
+            .zip(corrections.as_ref().iter())
+            .for_each(|(target, correction)| *target ^= *correction);
+    }
+
+    pub fn apply_corrections_detached(
+        parity: &mut [u8],
+        data: &mut [u8],
+        corrections: impl AsRef<[u8]>,
+    ) {
+        let corrections = corrections.as_ref();
+        Self::apply_corrections(parity, &corrections[..parity.len()]);
+        Self::apply_corrections(data, &corrections[parity.len()..]);
     }
 }
 
