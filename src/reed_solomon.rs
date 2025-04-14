@@ -4,9 +4,9 @@ use crate::cow::Cow;
 use crate::error::{
     PolynomialError, RSConstructorError, RSDecodeError, RSEncodeError, RSGenerateParityError,
 };
-use crate::finite_field::{add, div, inv, mul, ANTILOG_TABLE};
+use crate::finite_field::{div, inv, mul, ANTILOG_TABLE};
 use crate::polynomial::{
-    poly_div, poly_eval, poly_eval_deriv, poly_eval_detached, poly_mul, poly_rem,
+    poly_div, poly_eval, poly_eval_deriv, poly_eval_detached, poly_mul, poly_rem, poly_sub,
 };
 
 pub struct ReedSolomon {
@@ -324,28 +324,8 @@ fn euclidean_for_rs(s: &[u8], t: usize) -> Result<(Vec<u8>, Vec<u8>), Polynomial
     Ok((t1, r1))
 }
 
-/// Subtracts two polynomials (same as addition in GF(2)).
-#[allow(clippy::needless_range_loop)]
-fn poly_sub(p1: &[u8], p2: &[u8]) -> Vec<u8> {
-    let len = p1.len().max(p2.len());
-    let mut result = vec![0u8; len];
-    for i in 0..len {
-        let a = p1.get(i).copied().unwrap_or(0);
-        let b = p2.get(i).copied().unwrap_or(0);
-        result[i] = add(a, b);
-    }
-    trim_leading_zeros(&mut result);
-    result
-}
-
 fn degree(poly: &[u8]) -> Option<usize> {
     poly.iter().rposition(|&x| x != 0)
-}
-
-fn trim_leading_zeros(poly: &mut Vec<u8>) {
-    while poly.len() > 1 && poly.last() == Some(&0) {
-        poly.pop();
-    }
 }
 
 pub enum RSValidationResult {
