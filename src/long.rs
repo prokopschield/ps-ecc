@@ -98,7 +98,7 @@ pub fn encode(
 
     let mut codeword = Buffer::with_capacity(full_length)?;
 
-    codeword.extend_from_slice(&header.to_bytes())?;
+    codeword.extend_from_slice(header.to_bytes())?;
     codeword.extend_from_slice(message)?;
 
     if parity == 0 {
