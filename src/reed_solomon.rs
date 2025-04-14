@@ -73,7 +73,8 @@ impl ReedSolomon {
     }
 
     /// Validates a received codeword.
-    #[must_use]
+    /// # Errors
+    /// `Err(syndromes)` is returned if the codeword is invalid.
     pub fn validate(&self, received: &[u8]) -> RSValidationResult {
         let num_parity_bytes = usize::from(self.parity_bytes());
 
@@ -82,14 +83,15 @@ impl ReedSolomon {
             .collect();
 
         if syndromes.iter().all(|&s| s == 0) {
-            RSValidationResult::Valid
+            Ok(())
         } else {
-            RSValidationResult::Invalid(syndromes)
+            Err(syndromes)
         }
     }
 
     /// Validates a regregated (parity, message) pair.
-    #[must_use]
+    /// # Errors
+    /// `Err(syndromes)` is returned if the codeword is invalid.
     #[allow(clippy::cast_possible_truncation)]
     pub fn validate_detached(parity: &[u8], data: &[u8]) -> RSValidationResult {
         let syndromes: Vec<u8> = (0..parity.len())
@@ -97,9 +99,9 @@ impl ReedSolomon {
             .collect();
 
         if syndromes.iter().all(|&s| s == 0) {
-            RSValidationResult::Valid
+            Ok(())
         } else {
-            RSValidationResult::Invalid(syndromes)
+            Err(syndromes)
         }
     }
 
@@ -175,12 +177,10 @@ impl ReedSolomon {
     /// - [`ps_buffer::BufferError`] is returned if memory allocation fails.
     /// - [`RSDecodeError`] is propagated from [`ReedSolomon::compute_errors`].
     pub fn correct<'lt>(&self, received: &'lt [u8]) -> Result<Cow<'lt>, RSDecodeError> {
-        use RSValidationResult::{Invalid, Valid};
-
         // Compute syndromes
         let syndromes = match self.validate(received) {
-            Valid => return Ok(Cow::Borrowed(received)),
-            Invalid(syndromes) => syndromes,
+            Ok(()) => return Ok(Cow::Borrowed(received)),
+            Err(syndromes) => syndromes,
         };
 
         let errors = self.compute_errors(received.len(), &syndromes)?;
@@ -198,14 +198,12 @@ impl ReedSolomon {
     /// - [`ps_buffer::BufferError`] is returned if memory allocation fails.
     /// - [`RSDecodeError`] is propagated from [`ReedSolomon::compute_errors`].
     pub fn decode<'lt>(&self, received: &'lt [u8]) -> Result<Cow<'lt>, RSDecodeError> {
-        use RSValidationResult::{Invalid, Valid};
-
         let num_parity = usize::from(self.parity_bytes());
 
         // Compute syndromes
         let syndromes = match self.validate(received) {
-            Valid => return Ok(received[num_parity..].into()),
-            Invalid(syndromes) => syndromes,
+            Ok(()) => return Ok(received[num_parity..].into()),
+            Err(syndromes) => syndromes,
         };
 
         let errors = self.compute_errors(received.len(), &syndromes)?;
@@ -226,15 +224,13 @@ impl ReedSolomon {
         parity: &[u8],
         data: &'lt [u8],
     ) -> Result<Cow<'lt>, RSDecodeError> {
-        use RSValidationResult::{Invalid, Valid};
-
         let parity_bytes = parity.len();
         let num_parity = parity_bytes >> 1;
         let length = parity_bytes + data.len();
 
         let syndromes = match Self::validate_detached(parity, data) {
-            Valid => return Ok(data.into()),
-            Invalid(syndromes) => syndromes,
+            Ok(()) => return Ok(data.into()),
+            Err(syndromes) => syndromes,
         };
 
         let errors = Self::compute_errors_detached(num_parity, length, &syndromes)?;
@@ -263,15 +259,13 @@ impl ReedSolomon {
         parity: &mut [u8],
         data: &mut [u8],
     ) -> Result<(), RSDecodeError> {
-        use RSValidationResult::{Invalid, Valid};
-
         let parity_bytes = parity.len();
         let num_parity = parity_bytes >> 1;
         let length = parity_bytes + data.len();
 
         let syndromes = match Self::validate_detached(parity, data) {
-            Valid => return Ok(()),
-            Invalid(syndromes) => syndromes,
+            Ok(()) => return Ok(()),
+            Err(syndromes) => syndromes,
         };
 
         let errors = Self::compute_errors_detached(num_parity, length, &syndromes)?;
@@ -332,9 +326,4 @@ fn degree(poly: &[u8]) -> Option<usize> {
     poly.iter().rposition(|&x| x != 0)
 }
 
-pub enum RSValidationResult {
-    /// Received string is correct.
-    Valid,
-    /// Received string is incorrect with these syndromes.
-    Invalid(Vec<u8>),
-}
+type RSValidationResult = Result<(), Vec<u8>>;
