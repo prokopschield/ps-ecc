@@ -190,7 +190,10 @@ impl ReedSolomon {
 
         Self::apply_corrections(&mut corrected, &errors);
 
-        Ok(corrected.into())
+        match Self::validate(self, &corrected) {
+            Ok(()) => Ok(corrected.into()),
+            Err(_) => Err(RSDecodeError::TooManyErrors),
+        }
     }
 
     /// Decodes a received codeword, correcting errors if possible.
@@ -240,7 +243,10 @@ impl ReedSolomon {
 
         Self::apply_corrections(&mut corrected, &errors[parity_bytes..]);
 
-        Ok(corrected.into())
+        match Self::validate_detached(parity, &corrected) {
+            Ok(()) => Ok(corrected.into()),
+            Err(_) => Err(RSDecodeError::TooManyErrors),
+        }
     }
 
     /// Corrects a message based on detached parity bytes.
@@ -272,7 +278,7 @@ impl ReedSolomon {
 
         Self::apply_corrections_detached(parity, data, &errors);
 
-        Ok(())
+        Self::validate_detached(parity, data).map_err(|_| RSDecodeError::TooManyErrors)
     }
 
     pub fn apply_corrections(target: &mut [u8], corrections: impl AsRef<[u8]>) {
