@@ -195,6 +195,26 @@ impl ReedSolomon {
             Err(_) => Err(RSDecodeError::TooManyErrors),
         }
     }
+    /// Corrects a received codeword in-place.
+    /// # Errors
+    /// - [`ps_buffer::BufferError`] is returned if memory allocation fails.
+    /// - [`RSDecodeError`] is propagated from [`ReedSolomon::compute_errors`].
+    /// - [`RSDecodeError::TooManyErrors`] is returned if the data is unrecoverable.
+    pub fn correct_in_place<'lt>(&self, received: &'lt mut [u8]) -> Result<(), RSDecodeError> {
+        let syndromes = match self.validate(received) {
+            Ok(()) => return Ok(()),
+            Err(syndromes) => syndromes,
+        };
+
+        let errors = self.compute_errors(received.len(), &syndromes)?;
+
+        Self::apply_corrections(received, errors);
+
+        match Self::validate(self, received) {
+            Ok(()) => Ok(()),
+            Err(_) => Err(RSDecodeError::TooManyErrors),
+        }
+    }
 
     /// Decodes a received codeword, correcting errors if possible.
     /// # Errors
