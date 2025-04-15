@@ -253,15 +253,18 @@ impl ReedSolomon {
     /// # Errors
     /// - [`RSDecodeError`] is returned if `data` is not recoverable.
     #[inline]
-    pub fn correct_detached_in_place(parity: &[u8], data: &mut [u8]) -> Result<(), RSDecodeError> {
-        Self::correct_both_detached_in_place(&mut parity.to_buffer()?, data)
+    pub fn correct_detached_data_in_place(
+        parity: &[u8],
+        data: &mut [u8],
+    ) -> Result<(), RSDecodeError> {
+        Self::correct_detached_in_place(&mut parity.to_buffer()?, data)
     }
 
     /// Corrects a message based on detached parity bytes.
     /// Also corrects the parity bytes.
     /// # Errors
     /// - [`RSDecodeError`] is propagated from [`ReedSolomon::compute_errors`].
-    pub fn correct_both_detached_in_place(
+    pub fn correct_detached_in_place(
         parity: &mut [u8],
         data: &mut [u8],
     ) -> Result<(), RSDecodeError> {
