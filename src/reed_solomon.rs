@@ -1,4 +1,4 @@
-use ps_buffer::{Buffer, ByteIteratorIntoBuffer, ToBuffer};
+use ps_buffer::{Buffer, BufferError, ByteIteratorIntoBuffer, ToBuffer};
 
 use crate::cow::Cow;
 use crate::error::{
@@ -8,6 +8,7 @@ use crate::finite_field::{div, inv, mul, ANTILOG_TABLE};
 use crate::polynomial::{
     poly_div, poly_eval, poly_eval_deriv, poly_eval_detached, poly_mul, poly_rem, poly_sub,
 };
+use crate::RSValidationError;
 
 pub struct ReedSolomon {
     parity: u8,
@@ -72,20 +73,37 @@ impl ReedSolomon {
         Ok(buffer)
     }
 
+    /// Computes the syndromes of a given codeword.
+    /// # Errors
+    /// - [`BufferError`] if allocation fails
+    pub fn compute_syndromes(
+        num_parity_bytes: impl Into<usize>,
+        received: &[u8],
+    ) -> Result<Buffer, BufferError> {
+        (0..num_parity_bytes.into())
+            .map(|i| poly_eval(received, ANTILOG_TABLE[i + 1]))
+            .into_buffer()
+    }
+
+    /// Computes the syndromes of a given detached codeword.
+    /// # Errors
+    /// - [`BufferError`] if allocation fails
+    pub fn compute_syndromes_detached(parity: &[u8], data: &[u8]) -> Result<Buffer, BufferError> {
+        (0..parity.len())
+            .map(|i| poly_eval_detached(parity, data, ANTILOG_TABLE[i + 1]))
+            .into_buffer()
+    }
+
     /// Validates a received codeword.
     /// # Errors
     /// `Err(syndromes)` is returned if the codeword is invalid.
-    pub fn validate(&self, received: &[u8]) -> RSValidationResult {
-        let num_parity_bytes = usize::from(self.parity_bytes());
-
-        let syndromes: Vec<u8> = (0..num_parity_bytes)
-            .map(|i| poly_eval(received, ANTILOG_TABLE[i + 1]))
-            .collect();
+    pub fn validate(&self, received: &[u8]) -> Result<Option<Buffer>, RSValidationError> {
+        let syndromes = Self::compute_syndromes(self.parity_bytes(), received)?;
 
         if syndromes.iter().all(|&s| s == 0) {
-            Ok(())
+            Ok(None)
         } else {
-            Err(syndromes)
+            Ok(Some(syndromes))
         }
     }
 
@@ -93,15 +111,16 @@ impl ReedSolomon {
     /// # Errors
     /// `Err(syndromes)` is returned if the codeword is invalid.
     #[allow(clippy::cast_possible_truncation)]
-    pub fn validate_detached(parity: &[u8], data: &[u8]) -> RSValidationResult {
-        let syndromes: Vec<u8> = (0..parity.len())
-            .map(|i| poly_eval_detached(parity, data, ANTILOG_TABLE[i + 1]))
-            .collect();
+    pub fn validate_detached(
+        parity: &[u8],
+        data: &[u8],
+    ) -> Result<Option<Buffer>, RSValidationError> {
+        let syndromes = Self::compute_syndromes_detached(parity, data)?;
 
         if syndromes.iter().all(|&s| s == 0) {
-            Ok(())
+            Ok(None)
         } else {
-            Err(syndromes)
+            Ok(Some(syndromes))
         }
     }
 
@@ -178,9 +197,9 @@ impl ReedSolomon {
     /// - [`RSDecodeError`] is propagated from [`ReedSolomon::compute_errors`].
     pub fn correct<'lt>(&self, received: &'lt [u8]) -> Result<Cow<'lt>, RSDecodeError> {
         // Compute syndromes
-        let syndromes = match self.validate(received) {
-            Ok(()) => return Ok(Cow::Borrowed(received)),
-            Err(syndromes) => syndromes,
+        let syndromes = match self.validate(received)? {
+            None => return Ok(Cow::Borrowed(received)),
+            Some(syndromes) => syndromes,
         };
 
         let errors = self.compute_errors(received.len(), &syndromes)?;
@@ -190,9 +209,9 @@ impl ReedSolomon {
 
         Self::apply_corrections(&mut corrected, &errors);
 
-        match Self::validate(self, &corrected) {
-            Ok(()) => Ok(corrected.into()),
-            Err(_) => Err(RSDecodeError::TooManyErrors),
+        match Self::validate(self, &corrected)? {
+            None => Ok(corrected.into()),
+            Some(_) => Err(RSDecodeError::TooManyErrors),
         }
     }
     /// Corrects a received codeword in-place.
@@ -200,19 +219,19 @@ impl ReedSolomon {
     /// - [`ps_buffer::BufferError`] is returned if memory allocation fails.
     /// - [`RSDecodeError`] is propagated from [`ReedSolomon::compute_errors`].
     /// - [`RSDecodeError::TooManyErrors`] is returned if the data is unrecoverable.
-    pub fn correct_in_place<'lt>(&self, received: &'lt mut [u8]) -> Result<(), RSDecodeError> {
-        let syndromes = match self.validate(received) {
-            Ok(()) => return Ok(()),
-            Err(syndromes) => syndromes,
+    pub fn correct_in_place(&self, received: &mut [u8]) -> Result<(), RSDecodeError> {
+        let syndromes = match self.validate(received)? {
+            None => return Ok(()),
+            Some(syndromes) => syndromes,
         };
 
         let errors = self.compute_errors(received.len(), &syndromes)?;
 
         Self::apply_corrections(received, errors);
 
-        match Self::validate(self, received) {
-            Ok(()) => Ok(()),
-            Err(_) => Err(RSDecodeError::TooManyErrors),
+        match Self::validate(self, received)? {
+            None => Ok(()),
+            Some(_) => Err(RSDecodeError::TooManyErrors),
         }
     }
 
@@ -224,9 +243,9 @@ impl ReedSolomon {
         let num_parity = usize::from(self.parity_bytes());
 
         // Compute syndromes
-        let syndromes = match self.validate(received) {
-            Ok(()) => return Ok(received[num_parity..].into()),
-            Err(syndromes) => syndromes,
+        let syndromes = match self.validate(received)? {
+            None => return Ok(received[num_parity..].into()),
+            Some(syndromes) => syndromes,
         };
 
         let errors = self.compute_errors(received.len(), &syndromes)?;
@@ -251,9 +270,9 @@ impl ReedSolomon {
         let num_parity = parity_bytes >> 1;
         let length = parity_bytes + data.len();
 
-        let syndromes = match Self::validate_detached(parity, data) {
-            Ok(()) => return Ok(data.into()),
-            Err(syndromes) => syndromes,
+        let syndromes = match Self::validate_detached(parity, data)? {
+            None => return Ok(data.into()),
+            Some(syndromes) => syndromes,
         };
 
         let errors = Self::compute_errors_detached(num_parity, length, &syndromes)?;
@@ -263,9 +282,9 @@ impl ReedSolomon {
 
         Self::apply_corrections(&mut corrected, &errors[parity_bytes..]);
 
-        match Self::validate_detached(parity, &corrected) {
-            Ok(()) => Ok(corrected.into()),
-            Err(_) => Err(RSDecodeError::TooManyErrors),
+        match Self::validate_detached(parity, &corrected)? {
+            None => Ok(corrected.into()),
+            Some(_) => Err(RSDecodeError::TooManyErrors),
         }
     }
 
@@ -292,16 +311,19 @@ impl ReedSolomon {
         let num_parity = parity_bytes >> 1;
         let length = parity_bytes + data.len();
 
-        let syndromes = match Self::validate_detached(parity, data) {
-            Ok(()) => return Ok(()),
-            Err(syndromes) => syndromes,
+        let syndromes = match Self::validate_detached(parity, data)? {
+            None => return Ok(()),
+            Some(syndromes) => syndromes,
         };
 
         let errors = Self::compute_errors_detached(num_parity, length, &syndromes)?;
 
         Self::apply_corrections_detached(parity, data, &errors);
 
-        Self::validate_detached(parity, data).map_err(|_| RSDecodeError::TooManyErrors)
+        match Self::validate_detached(parity, data)? {
+            None => Ok(()),
+            Some(_) => Err(RSDecodeError::TooManyErrors),
+        }
     }
 
     pub fn apply_corrections(target: &mut [u8], corrections: impl AsRef<[u8]>) {
@@ -354,5 +376,3 @@ fn euclidean_for_rs(s: &[u8], t: usize) -> Result<(Buffer, Buffer), PolynomialEr
 fn degree(poly: &[u8]) -> Option<usize> {
     poly.iter().rposition(|&x| x != 0)
 }
-
-type RSValidationResult = Result<(), Vec<u8>>;

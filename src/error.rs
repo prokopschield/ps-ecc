@@ -44,6 +44,12 @@ pub enum RSEncodeError {
 }
 
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
+pub enum RSValidationError {
+    #[error(transparent)]
+    BufferError(#[from] BufferError),
+}
+
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum RSDecodeError {
     #[error(transparent)]
     BufferError(#[from] BufferError),
@@ -51,6 +57,8 @@ pub enum RSDecodeError {
     GFError(#[from] GFError),
     #[error(transparent)]
     PolynomialError(#[from] PolynomialError),
+    #[error(transparent)]
+    RSValidationError(#[from] RSValidationError),
     #[error("Too many errors to correct.")]
     TooManyErrors,
     #[error("Derivative evaluated to zero.")]
