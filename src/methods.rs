@@ -32,7 +32,7 @@ pub fn decode(received: &[u8], parity: u8) -> Result<Codeword, DecodeError> {
 
         let rs = ReedSolomon::new(parity)?;
 
-        Ok(rs.decode(received)?.into())
+        Ok(rs.decode(received)?)
     } else {
         Ok(long::decode(received)?)
     }
