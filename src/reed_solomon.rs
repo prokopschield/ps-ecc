@@ -384,3 +384,118 @@ fn euclidean_for_rs(s: &[u8], t: usize) -> Result<(Buffer, Buffer), RSEuclideanE
 fn degree(poly: &[u8]) -> Option<usize> {
     poly.iter().rposition(|&x| x != 0)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ps_buffer::ToBuffer;
+    use thiserror::Error;
+
+    #[derive(Error, Debug)]
+    enum TestError {
+        #[error(transparent)]
+        Buffer(#[from] ps_buffer::BufferError),
+        #[error(transparent)]
+        Polynomial(#[from] PolynomialError),
+        #[error(transparent)]
+        RSConstructor(#[from] RSConstructorError),
+        #[error(transparent)]
+        RSEncode(#[from] RSEncodeError),
+        #[error(transparent)]
+        RSDecode(#[from] RSDecodeError),
+        #[error(transparent)]
+        RSGenerateParity(#[from] RSGenerateParityError),
+        #[error(transparent)]
+        RSValidation(#[from] RSValidationError),
+    }
+
+    #[test]
+    fn test_encode_decode() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(4)?;
+        let message = b"Hello, World!".to_buffer()?;
+        let encoded = rs.encode(&message)?;
+
+        let mut corrupted = Buffer::with_capacity(encoded.len())?;
+        corrupted.extend_from_slice(&encoded)?;
+        corrupted[2] ^= 1;
+
+        let decoded = rs.decode(&corrupted)?;
+        assert_eq!(&decoded[..], &message[..]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_too_many_errors() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(2)?;
+        let message = b"Hello, World!".to_buffer()?;
+        let encoded = rs.encode(&message)?;
+
+        let mut corrupted = Buffer::with_capacity(encoded.len())?;
+        corrupted.extend_from_slice(&encoded)?;
+        corrupted[5] ^= 113;
+        corrupted[6] ^= 59;
+        corrupted[7] ^= 3;
+
+        assert_eq!(
+            rs.decode(&corrupted),
+            Err(RSDecodeError::RSComputeErrorsError(
+                RSComputeErrorsError::TooManyErrors
+            ))
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_validate() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(4)?;
+        let message = b"Hello, World!".to_buffer()?;
+        let encoded = rs.encode(&message)?;
+
+        assert!(rs.validate(&encoded)?.is_none());
+
+        let mut corrupted = Buffer::with_capacity(encoded.len())?;
+        corrupted.extend_from_slice(&encoded)?;
+        corrupted[2] ^= 1;
+
+        assert!(rs.validate(&corrupted)?.is_some());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_validate_detached() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(4)?;
+        let message = b"Hello, World!".to_buffer()?;
+        let parity = rs.generate_parity(&message)?;
+
+        assert!(ReedSolomon::validate_detached(&parity, &message)?.is_none());
+
+        let mut corrupted = Buffer::with_capacity(message.len())?;
+        corrupted.extend_from_slice(&message)?;
+        corrupted[2] ^= 1;
+
+        assert!(ReedSolomon::validate_detached(&parity, &corrupted)?.is_some());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_correct_both_detached_in_place() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(4)?;
+        let message = b"Hello, World!".to_buffer()?;
+        let mut data = Buffer::with_capacity(message.len())?;
+        data.extend_from_slice(&message)?;
+        let mut parity = rs.generate_parity(&message)?;
+
+        data[2] ^= 1;
+
+        ReedSolomon::correct_detached_in_place(&mut parity, &mut data)?;
+
+        assert_eq!(data.as_slice(), message.as_slice());
+        assert_eq!(parity, rs.generate_parity(&message)?);
+
+        Ok(())
+    }
+}
