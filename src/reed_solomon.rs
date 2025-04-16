@@ -8,7 +8,7 @@ use crate::finite_field::{div, inv, mul, ANTILOG_TABLE};
 use crate::polynomial::{
     poly_div, poly_eval, poly_eval_deriv, poly_eval_detached, poly_mul, poly_rem, poly_sub,
 };
-use crate::{RSComputeErrorsError, RSEuclideanError, RSValidationError};
+use crate::{Codeword, RSComputeErrorsError, RSEuclideanError, RSValidationError};
 
 pub struct ReedSolomon {
     parity: u8,
@@ -272,10 +272,11 @@ impl ReedSolomon {
     pub fn correct_detached<'lt>(
         parity: &[u8],
         data: &'lt [u8],
-    ) -> Result<Cow<'lt>, RSDecodeError> {
+    ) -> Result<Codeword<'lt>, RSDecodeError> {
         let parity_bytes = parity.len();
         let num_parity = parity_bytes >> 1;
         let length = parity_bytes + data.len();
+        let rs = Self::new(num_parity.try_into()?)?;
 
         let syndromes = Self::compute_syndromes_detached(parity, data)?;
 
@@ -285,14 +286,22 @@ impl ReedSolomon {
         };
 
         // Correct the received codeword
-        let mut corrected = Buffer::from_slice(data)?;
+        let mut corrected = Buffer::with_capacity(parity.len() + data.len())?;
 
-        Self::apply_corrections(&mut corrected, &errors[parity_bytes..]);
+        corrected.extend_from_slice(parity)?;
+        corrected.extend_from_slice(data)?;
 
-        match Self::validate_detached(parity, &corrected)? {
-            None => Ok(corrected.into()),
-            Some(_) => Err(RSDecodeError::TooManyErrors),
-        }
+        Self::apply_corrections(&mut corrected, &errors);
+
+        if let Some(_syndromes) = rs.validate(&corrected)? {
+            return Err(RSDecodeError::TooManyErrors);
+        };
+
+        let range = parity.len()..corrected.len();
+        let codeword = Cow::Owned(corrected);
+        let codeword = Codeword { codeword, range };
+
+        Ok(codeword)
     }
 
     /// Corrects a message based on detached parity bytes.

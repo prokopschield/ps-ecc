@@ -78,9 +78,13 @@ pub enum RSDecodeError {
     #[error(transparent)]
     RSComputeErrorsError(#[from] RSComputeErrorsError),
     #[error(transparent)]
+    RSConstructorError(#[from] RSConstructorError),
+    #[error(transparent)]
     RSValidationError(#[from] RSValidationError),
     #[error("Too many errors to correct.")]
     TooManyErrors,
+    #[error(transparent)]
+    TryFromIntError(#[from] TryFromIntError),
 }
 
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
