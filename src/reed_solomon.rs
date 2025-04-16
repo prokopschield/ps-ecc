@@ -205,11 +205,7 @@ impl ReedSolomon {
     /// - [`ps_buffer::BufferError`] is returned if memory allocation fails.
     /// - [`RSDecodeError`] is propagated from [`ReedSolomon::compute_errors`].
     pub fn correct<'lt>(&self, received: &'lt [u8]) -> Result<Cow<'lt>, RSDecodeError> {
-        // Compute syndromes
-        let syndromes = match self.validate(received)? {
-            None => return Ok(Cow::Borrowed(received)),
-            Some(syndromes) => syndromes,
-        };
+        let syndromes = Self::compute_syndromes(self.parity_bytes(), received)?;
 
         let errors = match self.compute_errors(received.len(), &syndromes)? {
             None => return Ok(Cow::Borrowed(received)),
@@ -232,10 +228,7 @@ impl ReedSolomon {
     /// - [`RSDecodeError`] is propagated from [`ReedSolomon::compute_errors`].
     /// - [`RSDecodeError::TooManyErrors`] is returned if the data is unrecoverable.
     pub fn correct_in_place(&self, received: &mut [u8]) -> Result<(), RSDecodeError> {
-        let syndromes = match self.validate(received)? {
-            None => return Ok(()),
-            Some(syndromes) => syndromes,
-        };
+        let syndromes = Self::compute_syndromes(self.parity_bytes(), received)?;
 
         let errors = match self.compute_errors(received.len(), &syndromes)? {
             None => return Ok(()),
@@ -257,11 +250,7 @@ impl ReedSolomon {
     pub fn decode<'lt>(&self, received: &'lt [u8]) -> Result<Cow<'lt>, RSDecodeError> {
         let num_parity = usize::from(self.parity_bytes());
 
-        // Compute syndromes
-        let syndromes = match self.validate(received)? {
-            None => return Ok(received[num_parity..].into()),
-            Some(syndromes) => syndromes,
-        };
+        let syndromes = Self::compute_syndromes(num_parity, received)?;
 
         let errors = match self.compute_errors(received.len(), &syndromes)? {
             None => return Ok(received[num_parity..].into()),
@@ -288,10 +277,7 @@ impl ReedSolomon {
         let num_parity = parity_bytes >> 1;
         let length = parity_bytes + data.len();
 
-        let syndromes = match Self::validate_detached(parity, data)? {
-            None => return Ok(data.into()),
-            Some(syndromes) => syndromes,
-        };
+        let syndromes = Self::compute_syndromes_detached(parity, data)?;
 
         let errors = match Self::compute_errors_detached(num_parity, length, &syndromes)? {
             None => return Ok(data.into()),
@@ -332,10 +318,7 @@ impl ReedSolomon {
         let num_parity = parity_bytes >> 1;
         let length = parity_bytes + data.len();
 
-        let syndromes = match Self::validate_detached(parity, data)? {
-            None => return Ok(()),
-            Some(syndromes) => syndromes,
-        };
+        let syndromes = Self::compute_syndromes_detached(parity, data)?;
 
         let errors = match Self::compute_errors_detached(num_parity, length, &syndromes)? {
             None => return Ok(()),
