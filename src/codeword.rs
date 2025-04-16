@@ -4,6 +4,7 @@ use ps_buffer::Buffer;
 
 use crate::cow::Cow;
 
+#[derive(Debug, Hash, PartialEq, Eq)]
 pub struct Codeword<'lt> {
     pub codeword: Cow<'lt>,
     pub range: Range<usize>,
