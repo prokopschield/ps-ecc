@@ -8,7 +8,7 @@ use crate::finite_field::{div, inv, mul, ANTILOG_TABLE};
 use crate::polynomial::{
     poly_div, poly_eval, poly_eval_deriv, poly_eval_detached, poly_mul, poly_rem, poly_sub,
 };
-use crate::RSValidationError;
+use crate::{RSComputeErrorsError, RSEuclideanError, RSValidationError};
 
 pub struct ReedSolomon {
     parity: u8,
@@ -128,7 +128,11 @@ impl ReedSolomon {
     /// # Errors
     /// - [`ps_buffer::BufferError`] is returned if memory allocation fails.
     /// - [`RSDecodeError::TooManyErrors`] is returned if the input is unrecoverable.
-    pub fn compute_errors(&self, length: usize, syndromes: &[u8]) -> Result<Buffer, RSDecodeError> {
+    pub fn compute_errors(
+        &self,
+        length: usize,
+        syndromes: &[u8],
+    ) -> Result<Option<Buffer>, RSComputeErrorsError> {
         Self::compute_errors_detached(self.parity(), length, syndromes)
     }
 
@@ -146,16 +150,20 @@ impl ReedSolomon {
         parity: impl Into<usize>,
         length: usize,
         syndromes: &[u8],
-    ) -> Result<Buffer, RSDecodeError> {
-        use RSDecodeError::{TooManyErrors, ZeroDerivative};
+    ) -> Result<Option<Buffer>, RSComputeErrorsError> {
+        if syndromes.iter().all(|&syndrome| syndrome == 0) {
+            return Ok(None);
+        }
 
         let parity = parity.into();
 
         // Euclidean algorithm to find error locator and evaluator polynomials
         let (mut sigma, mut omega) = euclidean_for_rs(syndromes, parity)?;
+
+        // Normalize sigma, omega
         let scale = inv(sigma[0])?;
-        sigma = sigma.iter().map(|&x| mul(x, scale)).into_buffer()?;
-        omega = omega.iter().map(|&x| mul(x, scale)).into_buffer()?;
+        sigma.iter_mut().for_each(|x| *x = mul(*x, scale));
+        omega.iter_mut().for_each(|x| *x = mul(*x, scale));
 
         // Find error positions
         let error_positions: Vec<usize> = (0..length)
@@ -168,8 +176,9 @@ impl ReedSolomon {
                 poly_eval(&sigma, x) == 0
             })
             .collect();
-        if error_positions.len() > parity {
-            return Err(TooManyErrors);
+
+        if error_positions.len() > parity || error_positions.is_empty() {
+            return Err(RSComputeErrorsError::TooManyErrors);
         }
 
         // Compute error values using Forney's formula
@@ -183,12 +192,12 @@ impl ReedSolomon {
             let omega_x = poly_eval(&omega, x);
             let sigma_deriv_x = poly_eval_deriv(&sigma, x);
             if sigma_deriv_x == 0 {
-                return Err(ZeroDerivative);
+                return Err(RSComputeErrorsError::ZeroErrorLocatorDerivative);
             }
             errors[j] = div(omega_x, sigma_deriv_x)?;
         }
 
-        Ok(errors)
+        Ok(Some(errors))
     }
 
     /// Corrects a received codeword, returning the corrected codeword.
@@ -202,7 +211,10 @@ impl ReedSolomon {
             Some(syndromes) => syndromes,
         };
 
-        let errors = self.compute_errors(received.len(), &syndromes)?;
+        let errors = match self.compute_errors(received.len(), &syndromes)? {
+            None => return Ok(Cow::Borrowed(received)),
+            Some(errors) => errors,
+        };
 
         // Correct the received codeword
         let mut corrected = Buffer::from_slice(received)?;
@@ -225,7 +237,10 @@ impl ReedSolomon {
             Some(syndromes) => syndromes,
         };
 
-        let errors = self.compute_errors(received.len(), &syndromes)?;
+        let errors = match self.compute_errors(received.len(), &syndromes)? {
+            None => return Ok(()),
+            Some(errors) => errors,
+        };
 
         Self::apply_corrections(received, errors);
 
@@ -248,7 +263,10 @@ impl ReedSolomon {
             Some(syndromes) => syndromes,
         };
 
-        let errors = self.compute_errors(received.len(), &syndromes)?;
+        let errors = match self.compute_errors(received.len(), &syndromes)? {
+            None => return Ok(received[num_parity..].into()),
+            Some(errors) => errors,
+        };
 
         // Correct the received codeword
         let mut corrected = Buffer::from_slice(&received[num_parity..])?;
@@ -275,7 +293,10 @@ impl ReedSolomon {
             Some(syndromes) => syndromes,
         };
 
-        let errors = Self::compute_errors_detached(num_parity, length, &syndromes)?;
+        let errors = match Self::compute_errors_detached(num_parity, length, &syndromes)? {
+            None => return Ok(data.into()),
+            Some(errors) => errors,
+        };
 
         // Correct the received codeword
         let mut corrected = Buffer::from_slice(data)?;
@@ -316,7 +337,10 @@ impl ReedSolomon {
             Some(syndromes) => syndromes,
         };
 
-        let errors = Self::compute_errors_detached(num_parity, length, &syndromes)?;
+        let errors = match Self::compute_errors_detached(num_parity, length, &syndromes)? {
+            None => return Ok(()),
+            Some(errors) => errors,
+        };
 
         Self::apply_corrections_detached(parity, data, &errors);
 
@@ -356,7 +380,7 @@ fn generate_generator_poly(num_roots: usize) -> Result<Buffer, PolynomialError> 
 }
 
 /// Extended Euclidean algorithm for Reed-Solomon decoding.
-fn euclidean_for_rs(s: &[u8], t: usize) -> Result<(Buffer, Buffer), PolynomialError> {
+fn euclidean_for_rs(s: &[u8], t: usize) -> Result<(Buffer, Buffer), RSEuclideanError> {
     let mut r0 = Buffer::alloc(2 * t + 1)?;
     r0[2 * t] = 1; // x^{2t}
     let mut r1 = s.to_buffer()?;

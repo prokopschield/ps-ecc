@@ -50,19 +50,37 @@ pub enum RSValidationError {
 }
 
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
-pub enum RSDecodeError {
+pub enum RSEuclideanError {
+    #[error(transparent)]
+    BufferError(#[from] BufferError),
+    #[error(transparent)]
+    PolynomialError(#[from] PolynomialError),
+}
+
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
+pub enum RSComputeErrorsError {
     #[error(transparent)]
     BufferError(#[from] BufferError),
     #[error(transparent)]
     GFError(#[from] GFError),
     #[error(transparent)]
-    PolynomialError(#[from] PolynomialError),
+    RSEuclideanError(#[from] RSEuclideanError),
+    #[error("Too many errors, input in unrecoverable.")]
+    TooManyErrors,
+    #[error("The error locator derivative evaluated to zero.")]
+    ZeroErrorLocatorDerivative,
+}
+
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
+pub enum RSDecodeError {
+    #[error(transparent)]
+    BufferError(#[from] BufferError),
+    #[error(transparent)]
+    RSComputeErrorsError(#[from] RSComputeErrorsError),
     #[error(transparent)]
     RSValidationError(#[from] RSValidationError),
     #[error("Too many errors to correct.")]
     TooManyErrors,
-    #[error("Derivative evaluated to zero.")]
-    ZeroDerivative,
 }
 
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
