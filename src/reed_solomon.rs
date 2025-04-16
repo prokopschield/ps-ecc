@@ -247,22 +247,14 @@ impl ReedSolomon {
     /// # Errors
     /// - [`ps_buffer::BufferError`] is returned if memory allocation fails.
     /// - [`RSDecodeError`] is propagated from [`ReedSolomon::compute_errors`].
-    pub fn decode<'lt>(&self, received: &'lt [u8]) -> Result<Cow<'lt>, RSDecodeError> {
-        let num_parity = usize::from(self.parity_bytes());
-
-        let syndromes = Self::compute_syndromes(num_parity, received)?;
-
-        let errors = match self.compute_errors(received.len(), &syndromes)? {
-            None => return Ok(received[num_parity..].into()),
-            Some(errors) => errors,
+    pub fn decode<'lt>(&self, received: &'lt [u8]) -> Result<Codeword<'lt>, RSDecodeError> {
+        let corrected = self.correct(received)?;
+        let codeword = Codeword {
+            codeword: corrected,
+            range: self.parity_bytes().into()..received.len(),
         };
 
-        // Correct the received codeword
-        let mut corrected = Buffer::from_slice(&received[num_parity..])?;
-
-        Self::apply_corrections(&mut corrected, &errors[num_parity..]);
-
-        Ok(corrected.into())
+        Ok(codeword)
     }
 
     /// Corrects a message based on detached parity bytes.
