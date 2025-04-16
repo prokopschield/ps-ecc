@@ -52,8 +52,8 @@ impl ReedSolomon {
         let dividend = vec![0u8; num_parity]
             .into_iter()
             .chain(message.iter().copied())
-            .collect::<Vec<u8>>();
-        let mut r = poly_rem(&dividend, &g)?;
+            .into_buffer()?;
+        let mut r = poly_rem(dividend, &g)?;
         if r.len() != num_parity {
             r.resize(num_parity, 0)?;
         }

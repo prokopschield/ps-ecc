@@ -38,9 +38,9 @@ pub fn poly_eval_detached(left: &[u8], right: &[u8], x: u8) -> u8 {
 }
 
 /// Computes the remainder of polynomial division.
-pub fn poly_rem(dividend: &[u8], divisor: &[u8]) -> Result<Buffer, PolynomialError> {
+pub fn poly_rem(dividend: Buffer, divisor: &[u8]) -> Result<Buffer, PolynomialError> {
     use PolynomialError::ZeroDivisor;
-    let mut rem = dividend.to_buffer()?;
+    let mut rem = dividend;
     let divisor_deg = degree(divisor).ok_or(ZeroDivisor)?;
     while let Some(deg) = degree(&rem) {
         if deg < divisor_deg {
