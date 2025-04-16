@@ -118,6 +118,10 @@ pub enum EccError {
 
 #[derive(Error, Debug, Clone, Copy)]
 pub enum LongEccConstructorError {
+    #[error("Received {0} header bytes, {0} < 16.")]
+    InsufficientHeaderBytes(u8),
+    #[error(transparent)]
+    TryFromIntError(#[from] TryFromIntError),
     #[error(transparent)]
     TryFromSliceError(#[from] TryFromSliceError),
 }

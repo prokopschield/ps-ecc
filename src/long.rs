@@ -23,6 +23,12 @@ pub struct LongEccHeader {
 
 impl LongEccHeader {
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, LongEccConstructorError> {
+        if bytes.len() < HEADER_SIZE {
+            return Err(LongEccConstructorError::InsufficientHeaderBytes(
+                bytes.len().try_into()?,
+            ));
+        }
+
         let header = Self {
             full_length: u32::from_le_bytes(bytes[0..4].try_into()?),
             message_length: u32::from_le_bytes(bytes[4..8].try_into()?),
