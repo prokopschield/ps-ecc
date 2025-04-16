@@ -81,7 +81,7 @@ pub enum RSDecodeError {
     RSConstructorError(#[from] RSConstructorError),
     #[error(transparent)]
     RSValidationError(#[from] RSValidationError),
-    #[error("Too many errors to correct.")]
+    #[error("Too many errors to correct. Error computation nevertheless returned a valid polynomial, which is unlikely. Usually you'll get RSComputeErrorsError(TooManyErrors) instead.")]
     TooManyErrors,
     #[error(transparent)]
     TryFromIntError(#[from] TryFromIntError),
