@@ -498,4 +498,399 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_new() {
+        assert!(ReedSolomon::new(0).is_ok());
+        assert!(ReedSolomon::new(10).is_ok());
+        assert!(ReedSolomon::new(127).is_ok());
+        assert!(ReedSolomon::new(128).is_err());
+    }
+
+    #[test]
+    fn test_parity() -> Result<(), RSConstructorError> {
+        let rs = ReedSolomon::new(8)?;
+        assert_eq!(rs.parity(), 8);
+        Ok(())
+    }
+
+    #[test]
+    fn test_parity_bytes() -> Result<(), RSConstructorError> {
+        let rs = ReedSolomon::new(8)?;
+        assert_eq!(rs.parity_bytes(), 16);
+        Ok(())
+    }
+
+    #[test]
+    fn test_generate_parity_no_errors() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(4)?;
+        let message = b"Test".to_buffer()?;
+        let parity = rs.generate_parity(&message)?;
+        assert_eq!(parity.len(), 8); // 4 parity * 2 bytes
+        Ok(())
+    }
+
+    #[test]
+    fn test_generate_parity_empty_message() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(2)?;
+        let message = b"".to_buffer()?;
+        let parity = rs.generate_parity(&message)?;
+        assert_eq!(parity.len(), 4);
+        assert_eq!(parity.as_slice(), &[0, 0, 0, 0]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_encode_correct_no_errors() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(2)?;
+        let message = b"Data".to_buffer()?;
+        let encoded = rs.encode(&message)?;
+        let decoded = rs.decode(&encoded)?;
+        assert_eq!(&decoded[..], &message[..]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_encode_correct_one_error() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(3)?;
+        let message = b"Example".to_buffer()?;
+        let encoded = rs.encode(&message)?;
+        let mut corrupted = encoded.clone()?;
+        corrupted[1] ^= 0b1010_1010;
+        let decoded = rs.decode(&corrupted)?;
+        assert_eq!(&decoded[..], &message[..]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_encode_correct_multiple_recoverable_errors() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(4)?;
+        let message = b"Multiple".to_buffer()?;
+        let encoded = rs.encode(&message)?;
+        let mut corrupted = encoded.clone()?;
+        corrupted[3] ^= 0b0011_0011;
+        corrupted[7] ^= 0b1100_1100;
+        let decoded = rs.decode(&corrupted)?;
+        assert_eq!(&decoded[..], &message[..]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_compute_syndromes_no_errors() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(2)?;
+        let message = b"Syndrome".to_buffer()?;
+        let encoded = rs.encode(&message)?;
+        let syndromes = ReedSolomon::compute_syndromes(rs.parity_bytes(), &encoded)?;
+        assert!(syndromes.iter().all(|&s| s == 0));
+        Ok(())
+    }
+
+    #[test]
+    fn test_compute_syndromes_with_errors() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(2)?;
+        let message = b"Syndrome".to_buffer()?;
+        let encoded = rs.encode(&message)?;
+        let mut corrupted = encoded.clone()?;
+        corrupted[0] ^= 1;
+        let syndromes = ReedSolomon::compute_syndromes(rs.parity_bytes(), &corrupted)?;
+        assert!(syndromes.iter().any(|&s| s != 0));
+        Ok(())
+    }
+
+    #[test]
+    fn test_compute_syndromes_detached_no_errors() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(3)?;
+        let message = b"Detached".to_buffer()?;
+        let parity = rs.generate_parity(&message)?;
+        let syndromes = ReedSolomon::compute_syndromes_detached(&parity, &message)?;
+        assert!(syndromes.iter().all(|&s| s == 0));
+        Ok(())
+    }
+
+    #[test]
+    fn test_compute_syndromes_detached_with_errors() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(3)?;
+        let message = b"Detached".to_buffer()?;
+        let parity = rs.generate_parity(&message)?;
+        let mut corrupted = message.clone()?;
+        corrupted[2] ^= 2;
+        let syndromes = ReedSolomon::compute_syndromes_detached(&parity, &corrupted)?;
+        assert!(syndromes.iter().any(|&s| s != 0));
+        Ok(())
+    }
+
+    #[test]
+    fn test_validate_no_errors() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(1)?;
+        let message = b"Valid".to_buffer()?;
+        let encoded = rs.encode(&message)?;
+        assert!(rs.validate(&encoded)?.is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn test_validate_with_errors() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(1)?;
+        let message = b"Valid".to_buffer()?;
+        let encoded = rs.encode(&message)?;
+        let mut corrupted = encoded.clone()?;
+        corrupted[0] ^= 4;
+        assert!(rs.validate(&corrupted)?.is_some());
+        Ok(())
+    }
+
+    #[test]
+    fn test_validate_detached_no_errors_case_2() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(2)?;
+        let message = b"Detached2".to_buffer()?;
+        let parity = rs.generate_parity(&message)?;
+        assert!(ReedSolomon::validate_detached(&parity, &message)?.is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn test_validate_detached_with_errors_case_2() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(2)?;
+        let message = b"Detached2".to_buffer()?;
+        let parity = rs.generate_parity(&message)?;
+        let mut corrupted = message.clone()?;
+        corrupted[1] ^= 8;
+        assert!(ReedSolomon::validate_detached(&parity, &corrupted)?.is_some());
+        Ok(())
+    }
+
+    #[test]
+    fn test_correct_in_place_no_errors() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(2)?;
+        let message = b"InPlace".to_buffer()?;
+        let mut encoded = rs.encode(&message)?;
+        rs.correct_in_place(&mut encoded)?;
+        assert_eq!(encoded.slice(4..), message.as_slice());
+        Ok(())
+    }
+
+    #[test]
+    fn test_correct_in_place_one_error() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(3)?;
+        let message = b"InPlace1".to_buffer()?;
+        let mut encoded = rs.encode(&message)?;
+        encoded[4] ^= 16;
+        rs.correct_in_place(&mut encoded)?;
+        assert_eq!(encoded.slice(6..), message.as_slice());
+        Ok(())
+    }
+
+    #[test]
+    fn test_correct_in_place_too_many_errors() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(1)?;
+        let message = b"TooMany".to_buffer()?;
+        let mut encoded = rs.encode(&message)?;
+        encoded[0] ^= 1;
+        encoded[1] ^= 2;
+        assert_eq!(
+            rs.correct_in_place(&mut encoded),
+            Err(RSDecodeError::RSComputeErrorsError(
+                RSComputeErrorsError::TooManyErrors
+            ))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_decode_no_errors() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(2)?;
+        let message = b"DecodeOk".to_buffer()?;
+        let encoded = rs.encode(&message)?;
+        let decoded = rs.decode(&encoded)?;
+        assert_eq!(&decoded[..], &message[..]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_decode_one_error() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(3)?;
+        let message = b"DecodeErr".to_buffer()?;
+        let encoded = rs.encode(&message)?;
+        let mut corrupted = encoded.clone()?;
+        corrupted[5] ^= 32;
+        let decoded = rs.decode(&corrupted)?;
+        assert_eq!(&decoded[..], &message[..]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_decode_too_many_errors() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(1)?;
+        let message = b"DecodeMany".to_buffer()?;
+        let encoded = rs.encode(&message)?;
+        let mut corrupted = encoded.clone()?;
+        corrupted[0] ^= 1;
+        corrupted[2] ^= 2;
+        assert_eq!(
+            rs.decode(&corrupted),
+            Err(RSDecodeError::RSComputeErrorsError(
+                RSComputeErrorsError::TooManyErrors
+            ))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_correct_detached_no_errors() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(2)?;
+        let message = b"DetachOk".to_buffer()?;
+        let parity = rs.generate_parity(&message)?;
+        let corrected = ReedSolomon::correct_detached(&parity, &message)?;
+        assert_eq!(&corrected[..], &message[..]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_correct_detached_one_error() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(3)?;
+        let message = b"DetachErr".to_buffer()?;
+        let parity = rs.generate_parity(&message)?;
+        let mut corrupted = message.clone()?;
+        corrupted[1] ^= 64;
+        let corrected = ReedSolomon::correct_detached(&parity, &corrupted)?;
+        assert_eq!(&corrected[..], &message[..]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_correct_detached_too_many_errors() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(1)?;
+        let message = b"DetachMany".to_buffer()?;
+        let parity = rs.generate_parity(&message)?;
+        let mut corrupted = message.clone()?;
+        corrupted[0] ^= 1;
+        corrupted[2] ^= 2;
+        assert_eq!(
+            ReedSolomon::correct_detached(&parity, &corrupted),
+            Err(RSDecodeError::RSComputeErrorsError(
+                RSComputeErrorsError::TooManyErrors
+            ))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_correct_detached_data_in_place_no_errors() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(2)?;
+        let message = b"DataInPlaceOk".to_buffer()?;
+        let parity = rs.generate_parity(&message)?;
+        let mut data = message.clone()?;
+        ReedSolomon::correct_detached_data_in_place(&parity, &mut data)?;
+        assert_eq!(data.as_slice(), message.as_slice());
+        Ok(())
+    }
+
+    #[test]
+    fn test_correct_detached_data_in_place_one_error() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(3)?;
+        let message = b"DataInPlaceErr".to_buffer()?;
+        let parity = rs.generate_parity(&message)?;
+        let mut data = message.clone()?;
+        data[3] ^= 128;
+        ReedSolomon::correct_detached_data_in_place(&parity, &mut data)?;
+        assert_eq!(data.as_slice(), message.as_slice());
+        Ok(())
+    }
+
+    #[test]
+    fn test_correct_detached_data_in_place_too_many_errors() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(1)?;
+        let message = b"DataInPlaceMany".to_buffer()?;
+        let parity = rs.generate_parity(&message)?;
+        let mut data = message.clone()?;
+        data[0] ^= 1;
+        data[2] ^= 2;
+        assert_eq!(
+            ReedSolomon::correct_detached_data_in_place(&parity, &mut data),
+            Err(RSDecodeError::RSComputeErrorsError(
+                RSComputeErrorsError::TooManyErrors
+            ))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_apply_corrections() -> Result<(), TestError> {
+        let mut target = Buffer::from_slice([1, 2, 3, 4])?;
+        let corrections = [0, 3, 0, 5];
+        ReedSolomon::apply_corrections(&mut target, corrections);
+        assert_eq!(target.as_slice(), &[1, 2 ^ 3, 3, 4 ^ 5]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_apply_corrections_detached() -> Result<(), TestError> {
+        let mut parity = Buffer::from_slice([10, 20])?;
+        let mut data = Buffer::from_slice([30, 40, 50])?;
+        let corrections = [1, 2, 3, 4, 5];
+        ReedSolomon::apply_corrections_detached(&mut parity, &mut data, corrections);
+        assert_eq!(parity.as_slice(), &[10 ^ 1, 20 ^ 2]);
+        assert_eq!(data.as_slice(), &[30 ^ 3, 40 ^ 4, 50 ^ 5]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_correct_both_detached_in_place_with_parity_error() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(4)?;
+        let message = b"HelloAgain!".to_buffer()?;
+        let mut data = Buffer::with_capacity(message.len())?;
+        data.extend_from_slice(&message)?;
+        let mut parity = rs.generate_parity(&message)?;
+
+        parity[1] ^= 8;
+
+        ReedSolomon::correct_detached_in_place(&mut parity, &mut data)?;
+
+        assert_eq!(data.as_slice(), message.as_slice());
+        assert_eq!(parity, rs.generate_parity(&message)?);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_correct_both_detached_in_place_with_both_errors() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(4)?;
+        let message = b"BothErrors".to_buffer()?;
+        let mut data = Buffer::with_capacity(message.len())?;
+        data.extend_from_slice(&message)?;
+        let mut parity = rs.generate_parity(&message)?;
+
+        data[3] ^= 16;
+        parity[0] ^= 4;
+
+        ReedSolomon::correct_detached_in_place(&mut parity, &mut data)?;
+
+        assert_eq!(data.as_slice(), message.as_slice());
+        assert_eq!(parity, rs.generate_parity(&message)?);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_correct_both_detached_in_place_too_many_errors() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(2)?;
+        let message = b"TooManyBoth".to_buffer()?;
+        let mut data = Buffer::with_capacity(message.len())?;
+        data.extend_from_slice(&message)?;
+        let mut parity = rs.generate_parity(&message)?;
+
+        data[0] ^= 1;
+        data[2] ^= 2;
+        parity[1] ^= 4;
+        parity[3] ^= 8;
+
+        assert_eq!(
+            ReedSolomon::correct_detached_in_place(&mut parity, &mut data),
+            Err(RSDecodeError::RSComputeErrorsError(
+                RSComputeErrorsError::TooManyErrors
+            ))
+        );
+
+        Ok(())
+    }
 }
