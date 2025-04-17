@@ -130,9 +130,20 @@ pub fn encode(
         index += segment_distance;
 
         if next_segment_length != segment_length {
+            debug_assert_eq!(
+                header.last_segment_length as usize, next_segment_length,
+                "Next segment length doesn't match"
+            );
+
             break;
         }
     }
+
+    debug_assert_eq!(
+        header.full_length as usize,
+        codeword.len(),
+        "Full length doesn't match"
+    );
 
     Ok(codeword)
 }
@@ -181,4 +192,373 @@ pub fn decode(codeword: &[u8]) -> Result<Codeword, LongEccDecodeError> {
     };
 
     Ok(codeword)
+}
+
+#[cfg(test)]
+mod tests {
+    use ps_buffer::ToBuffer;
+
+    use super::*;
+
+    #[derive(thiserror::Error, Debug)]
+    enum TestError {
+        #[error(transparent)]
+        LongEccConstructor(#[from] LongEccConstructorError),
+        #[error(transparent)]
+        LongEccEncode(#[from] LongEccEncodeError),
+        #[error(transparent)]
+        LongEccDecode(#[from] LongEccDecodeError),
+        #[error(transparent)]
+        LongEccToBytes(#[from] LongEccToBytesError),
+        #[error(transparent)]
+        RSConstructorError(#[from] crate::RSConstructorError),
+        #[error(transparent)]
+        RSGenerateParityError(#[from] crate::RSGenerateParityError),
+        #[error(transparent)]
+        Buffer(#[from] ps_buffer::BufferError),
+    }
+
+    #[test]
+    fn test_long_ecc_header_from_bytes() -> Result<(), TestError> {
+        let bytes = [
+            0x10, 0x00, 0x00, 0x00, // full length
+            0x08, 0x00, 0x00, 0x00, // message length
+            0x04, 0x0A, 0x05, 0x0B, // parity, seglen, segdist, lastseglen
+            0x2D, 0xE6, 0x64, 0x1A, // parity bytes
+        ];
+
+        let header = LongEccHeader::from_bytes(&bytes)?;
+
+        assert_eq!(header.full_length, 16);
+        assert_eq!(header.message_length, 8);
+        assert_eq!(header.parity, 4);
+        assert_eq!(header.segment_length, 10);
+        assert_eq!(header.segment_distance, 5);
+        assert_eq!(header.last_segment_length, 11);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_long_ecc_header_to_bytes() -> Result<(), TestError> {
+        let header = LongEccHeader {
+            full_length: 32,
+            message_length: 12,
+            parity: 6,
+            segment_length: 15,
+            segment_distance: 7,
+            last_segment_length: 18,
+        };
+        let bytes = header.to_bytes()?;
+        assert_eq!(&bytes[0..4], &32u32.to_le_bytes());
+        assert_eq!(&bytes[4..8], &12u32.to_le_bytes());
+        assert_eq!(bytes[8], 6);
+        assert_eq!(bytes[9], 15);
+        assert_eq!(bytes[10], 7);
+        assert_eq!(bytes[11], 18);
+        Ok(())
+    }
+
+    #[test]
+    fn test_long_ecc_encode_no_parity() -> Result<(), TestError> {
+        let message = b"No Parity".to_buffer()?;
+        let encoded = encode(&message, 0, 10, 5)?;
+        assert_eq!(encoded.len(), HEADER_SIZE + message.len());
+        let header = LongEccHeader::from_bytes(&encoded)?;
+        assert_eq!(header.parity, 0);
+        assert_eq!(header.full_length as usize, encoded.len());
+        assert_eq!(header.message_length as usize, message.len());
+        Ok(())
+    }
+
+    #[test]
+    fn test_long_ecc_encode_invalid_parity() -> Result<(), TestError> {
+        let message = b"Invalid Parity".to_buffer()?;
+        let result = encode(&message, 64, 10, 5);
+        assert!(matches!(result, Err(LongEccEncodeError::InvalidParity(64))));
+        Ok(())
+    }
+
+    #[test]
+    fn test_long_ecc_encode_invalid_segment_parity_ratio() -> Result<(), TestError> {
+        let message = b"Invalid Ratio".to_buffer()?;
+        let result = encode(&message, 5, 10, 8);
+        assert!(matches!(
+            result,
+            Err(LongEccEncodeError::InvalidSegmentParityRatio(8, 5))
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn test_long_ecc_encode_with_parity() -> Result<(), TestError> {
+        let message = b"With Parity".to_buffer()?;
+        let parity: u8 = 2;
+        let segment_length: u8 = 10;
+        let segment_distance: u8 = 8;
+        let encoded = encode(&message, parity, segment_length, segment_distance)?;
+        assert!(encoded.len() > HEADER_SIZE + message.len());
+        let header = LongEccHeader::from_bytes(&encoded)?;
+        assert_eq!(header.parity, parity);
+        assert_eq!(header.message_length as usize, message.len());
+        assert_eq!(header.segment_length, segment_length);
+        assert_eq!(header.segment_distance, segment_distance);
+        assert_eq!(header.full_length as usize, encoded.len());
+        Ok(())
+    }
+
+    #[test]
+    fn test_long_ecc_encode_uneven_segments() -> Result<(), TestError> {
+        let message = b"Uneven Segments".to_buffer()?;
+        let parity: u8 = 1;
+        let segment_length: u8 = 7;
+        let segment_distance: u8 = 5;
+        let encoded = encode(&message, parity, segment_length, segment_distance)?;
+        let header = LongEccHeader::from_bytes(&encoded)?;
+        assert_ne!(header.last_segment_length, segment_length);
+        assert_eq!(header.full_length as usize, encoded.len());
+        Ok(())
+    }
+
+    #[test]
+    fn test_long_ecc_correct_in_place_no_errors() -> Result<(), TestError> {
+        let message = b"Correct No Errors".to_buffer()?;
+        let parity: u8 = 2;
+        let segment_length: u8 = 10;
+        let segment_distance: u8 = 8;
+        let mut encoded = encode(&message, parity, segment_length, segment_distance)?;
+        let header = correct_in_place(&mut encoded)?;
+        assert_eq!(header.message_length as usize, message.len());
+        assert_eq!(
+            &encoded[HEADER_SIZE..HEADER_SIZE + message.len()],
+            &message[..]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_long_ecc_correct_in_place_one_error() -> Result<(), TestError> {
+        let message = b"Correct One Error".to_buffer()?;
+        let parity: u8 = 2;
+        let segment_length: u8 = 10;
+        let segment_distance: u8 = 8;
+        let mut encoded = encode(&message, parity, segment_length, segment_distance)?;
+        encoded[HEADER_SIZE + 5] ^= 0b0000_0001;
+        let header = correct_in_place(&mut encoded)?;
+        assert_eq!(header.message_length as usize, message.len());
+        assert_eq!(
+            &encoded[HEADER_SIZE..HEADER_SIZE + message.len()],
+            &message[..]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_long_ecc_correct_in_place_error_in_parity() -> Result<(), TestError> {
+        let message = b"Error In Parity".to_buffer()?;
+        let parity: u8 = 2;
+        let segment_length: u8 = 10;
+        let segment_distance: u8 = 8;
+        let mut encoded = encode(&message, parity, segment_length, segment_distance)?;
+        let parity_start = HEADER_SIZE + message.len();
+        encoded[parity_start + 1] ^= 0b0000_0010;
+        let header = correct_in_place(&mut encoded)?;
+        assert_eq!(header.message_length as usize, message.len());
+        // We can't directly check the parity bytes, but if decode works, it's likely the parity was corrected.
+        let decoded = decode(&encoded)?;
+        assert_eq!(&decoded[..], &message[..]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_long_ecc_correct_in_place_multiple_errors_recoverable() -> Result<(), TestError> {
+        let message = b"Multiple Recoverable".to_buffer()?;
+        let parity: u8 = 3;
+        let segment_length: u8 = 12;
+        let segment_distance: u8 = 8;
+        let mut encoded = encode(&message, parity, segment_length, segment_distance)?;
+        encoded[HEADER_SIZE + 1] ^= 0b0000_0001;
+        encoded[HEADER_SIZE + 7] ^= 0b0000_0010;
+        encoded[HEADER_SIZE + message.len() + 3] ^= 0b0000_0100;
+        let header = correct_in_place(&mut encoded)?;
+        assert_eq!(header.message_length as usize, message.len());
+        assert_eq!(
+            &encoded[HEADER_SIZE..HEADER_SIZE + message.len()],
+            &message[..]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_long_ecc_correct_in_place_too_many_errors() -> Result<(), TestError> {
+        let message = b"Too Many Errors".to_buffer()?;
+        let parity: u8 = 2;
+        let segment_length: u8 = 10;
+        let segment_distance: u8 = 8;
+        let mut encoded = encode(&message, parity, segment_length, segment_distance)?;
+        encoded[HEADER_SIZE + 1] ^= 0b0000_0001;
+        encoded[HEADER_SIZE + 3] ^= 0b0000_0010;
+        encoded[HEADER_SIZE + 5] ^= 0b0000_0100; // More errors than can be corrected by parity=2
+        let result = correct_in_place(&mut encoded);
+        assert!(matches!(
+            result,
+            Err(LongEccDecodeError::RSDecodeError(
+                crate::RSDecodeError::RSComputeErrorsError(
+                    crate::RSComputeErrorsError::TooManyErrors
+                )
+            ))
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn test_long_ecc_decode_no_errors() -> Result<(), TestError> {
+        let message = b"Decode No Errors".to_buffer()?;
+        let parity: u8 = 2;
+        let segment_length: u8 = 10;
+        let segment_distance: u8 = 8;
+        let encoded = encode(&message, parity, segment_length, segment_distance)?;
+        let decoded = decode(&encoded)?;
+        assert_eq!(&decoded[..], &message[..]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_long_ecc_decode_one_error() -> Result<(), TestError> {
+        let message = b"Decode One Error".to_buffer()?;
+        let parity: u8 = 2;
+        let segment_length: u8 = 10;
+        let segment_distance: u8 = 8;
+        let mut encoded = encode(&message, parity, segment_length, segment_distance)?;
+        encoded[HEADER_SIZE + 2] ^= 0b0000_0001;
+        let decoded = decode(&encoded)?;
+        assert_eq!(&decoded[..], &message[..]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_long_ecc_decode_too_many_errors() -> Result<(), TestError> {
+        let message = b"Decode Too Many".to_buffer()?;
+        let parity: u8 = 1;
+        let segment_length: u8 = 10;
+        let segment_distance: u8 = 8;
+        let mut encoded = encode(&message, parity, segment_length, segment_distance)?;
+        encoded[HEADER_SIZE + 1] ^= 0b0000_0001;
+        encoded[HEADER_SIZE + 3] ^= 0b0000_0010;
+        let result = decode(&encoded);
+        assert!(matches!(
+            result,
+            Err(LongEccDecodeError::RSDecodeError(
+                crate::RSDecodeError::RSComputeErrorsError(
+                    crate::RSComputeErrorsError::TooManyErrors
+                )
+            ))
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn test_long_ecc_decode_truncated_data() -> Result<(), TestError> {
+        let header = LongEccHeader {
+            full_length: 20,
+            message_length: 10,
+            parity: 1,
+            segment_length: 8,
+            segment_distance: 6,
+            last_segment_length: 8,
+        };
+        let mut truncated = header.to_bytes()?.to_vec();
+        truncated.extend_from_slice(&[0u8; 5]); // Only 5 message bytes instead of 10
+        let result = decode(&truncated);
+        eprintln!("{result:?}");
+        assert!(matches!(
+            result,
+            Err(crate::LongEccDecodeError::RSDecodeError(
+                crate::RSDecodeError::RSComputeErrorsError(
+                    crate::RSComputeErrorsError::TooManyErrors
+                )
+            )) // HEADER_SIZE + message_length = 12 + 10 = 22? No, 12 + 10 = 22. Header is 12. 12 + 10 = 22. Got 17.
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn test_long_ecc_decode_incorrect_full_length() -> Result<(), TestError> {
+        let message = b"Wrong Length".to_buffer()?;
+        let parity: u8 = 1;
+        let segment_length: u8 = 10;
+        let segment_distance: u8 = 8;
+        let encoded = encode(&message, parity, segment_length, segment_distance)?;
+        let mut incorrect_length = encoded.to_vec();
+        incorrect_length.pop();
+        let result = decode(&incorrect_length);
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn test_long_ecc_encode_zero_segment_distance() -> Result<(), TestError> {
+        let message = b"Zero Distance".to_buffer()?;
+        let parity: u8 = 2;
+        let segment_length: u8 = 10;
+        let segment_distance: u8 = 0;
+
+        assert_eq!(
+            encode(&message, parity, segment_length, segment_distance),
+            Err(LongEccEncodeError::InvalidSegmentParityRatio(0, 2))
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_long_ecc_encode_segment_length_smaller_than_distance() -> Result<(), TestError> {
+        let message = b"Small Segment".to_buffer()?;
+        let parity: u8 = 2;
+        let segment_length: u8 = 5;
+        let segment_distance: u8 = 10;
+        let encoded = encode(&message, parity, segment_length, segment_distance)?;
+        let header = LongEccHeader::from_bytes(&encoded)?;
+        assert_eq!(header.segment_length, segment_distance); // segment_length is max(segment_length, segment_distance)
+        Ok(())
+    }
+
+    #[test]
+    fn test_long_ecc_encode_empty_message() -> Result<(), TestError> {
+        let message = b"".to_buffer()?;
+        let parity: u8 = 2;
+        let segment_length: u8 = 10;
+        let segment_distance: u8 = 8;
+        let encoded = encode(&message, parity, segment_length, segment_distance)?;
+        assert_eq!(encoded.len(), HEADER_SIZE + 3 * (usize::from(parity) << 1));
+        let header = LongEccHeader::from_bytes(&encoded)?;
+        assert_eq!(header.message_length, 0);
+        assert_eq!(header.full_length as usize, encoded.len());
+        Ok(())
+    }
+
+    #[test]
+    fn test_long_ecc_correct_in_place_zero_parity() -> Result<(), TestError> {
+        let message = b"Zero Parity Correct".to_buffer()?;
+        let parity: u8 = 0;
+        let segment_length: u8 = 10;
+        let segment_distance: u8 = 8;
+        let mut encoded = encode(&message, parity, segment_length, segment_distance)?;
+        let header = correct_in_place(&mut encoded)?;
+        assert_eq!(header.parity, 0);
+        assert_eq!(&encoded[HEADER_SIZE..], &message[..]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_long_ecc_decode_zero_parity() -> Result<(), TestError> {
+        let message = b"Zero Parity Decode".to_buffer()?;
+        let parity: u8 = 0;
+        let segment_length: u8 = 10;
+        let segment_distance: u8 = 8;
+        let encoded = encode(&message, parity, segment_length, segment_distance)?;
+        let decoded = decode(&encoded)?;
+        assert_eq!(&decoded[..], &message[..]);
+        Ok(())
+    }
 }
