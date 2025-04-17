@@ -1,0 +1,16 @@
+[package]
+name = "ps-ecc"
+version = "0.1.0-1"
+description = "Generates Reed-Solomon error correction codes."
+license = "GPL-3.0-or-later"
+edition = "2021"
+
+[profile.dev]
+opt-level = 3
+
+[profile.release]
+opt-level = 3
+
+[dependencies]
+ps-buffer = "0.1.0-16"
+thiserror = "2.0.12"
