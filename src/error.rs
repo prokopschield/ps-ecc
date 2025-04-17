@@ -116,14 +116,24 @@ pub enum EccError {
     DecodeError(#[from] DecodeError),
 }
 
-#[derive(Error, Debug, Clone, Copy)]
+#[derive(Error, Debug, Clone)]
 pub enum LongEccConstructorError {
     #[error("Received {0} header bytes, {0} < 16.")]
     InsufficientHeaderBytes(u8),
     #[error(transparent)]
+    RSDecodeError(#[from] RSDecodeError),
+    #[error(transparent)]
     TryFromIntError(#[from] TryFromIntError),
     #[error(transparent)]
     TryFromSliceError(#[from] TryFromSliceError),
+}
+
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
+pub enum LongEccToBytesError {
+    #[error(transparent)]
+    RSConstructorError(#[from] RSConstructorError),
+    #[error(transparent)]
+    RSGenerateParityError(#[from] RSGenerateParityError),
 }
 
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
@@ -134,6 +144,8 @@ pub enum LongEccEncodeError {
     InvalidParity(u8),
     #[error("Invalid segment-to-parity ratio: {0} < 2 * {1}")]
     InvalidSegmentParityRatio(u8, u8),
+    #[error(transparent)]
+    LongEccToBytesError(#[from] LongEccToBytesError),
     #[error(transparent)]
     RSConstructorError(#[from] RSConstructorError),
     #[error(transparent)]

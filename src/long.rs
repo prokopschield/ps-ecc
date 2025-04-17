@@ -4,7 +4,7 @@ use ps_buffer::Buffer;
 
 use crate::{
     codeword::Codeword, LongEccConstructorError, LongEccDecodeError, LongEccEncodeError,
-    ReedSolomon,
+    LongEccToBytesError, ReedSolomon,
 };
 
 const HEADER_SIZE: usize = std::mem::size_of::<LongEccHeader>();
@@ -29,6 +29,8 @@ impl LongEccHeader {
             ));
         }
 
+        let bytes = ReedSolomon::correct_detached(&bytes[12..16], &bytes[0..12])?;
+
         let header = Self {
             full_length: u32::from_le_bytes(bytes[0..4].try_into()?),
             message_length: u32::from_le_bytes(bytes[4..8].try_into()?),
@@ -42,7 +44,7 @@ impl LongEccHeader {
     }
 
     #[inline]
-    pub fn to_bytes(self) -> [u8; HEADER_SIZE] {
+    pub fn to_bytes(self) -> Result<[u8; HEADER_SIZE], LongEccToBytesError> {
         let mut bytes = [0u8; HEADER_SIZE];
 
         bytes[0x0..0x4].copy_from_slice(&self.full_length.to_le_bytes());
@@ -52,7 +54,11 @@ impl LongEccHeader {
         bytes[0xA] = self.segment_distance;
         bytes[0xB] = self.last_segment_length;
 
-        bytes
+        let parity = ReedSolomon::new(2)?.generate_parity(&bytes[0..12])?;
+
+        bytes[0xC..=0xF].copy_from_slice(&parity);
+
+        Ok(bytes)
     }
 }
 
@@ -104,7 +110,7 @@ pub fn encode(
 
     let mut codeword = Buffer::with_capacity(full_length)?;
 
-    codeword.extend_from_slice(header.to_bytes())?;
+    codeword.extend_from_slice(header.to_bytes()?)?;
     codeword.extend_from_slice(message)?;
 
     if parity == 0 {
