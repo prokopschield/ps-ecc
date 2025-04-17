@@ -94,7 +94,7 @@ pub fn encode(
     let segment_length = usize::from(segment_length);
     let new_bytes_per_segment = segment_distance - parity_bytes;
     let segment_count = base_len
-        .saturating_sub(segment_distance.saturating_sub(1))
+        .saturating_sub(segment_length.saturating_sub(1))
         .div_ceil(new_bytes_per_segment)
         .saturating_add(1);
     let full_length = base_len + parity_bytes * segment_count;
