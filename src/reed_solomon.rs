@@ -81,7 +81,7 @@ impl ReedSolomon {
         received: &[u8],
     ) -> Result<Buffer, BufferError> {
         (0..num_parity_bytes.into())
-            .map(|i| poly_eval(received, ANTILOG_TABLE[i + 1]))
+            .map(|i| poly_eval(received, ANTILOG_TABLE[i + 1].get()))
             .into_buffer()
     }
 
@@ -90,7 +90,7 @@ impl ReedSolomon {
     /// - [`BufferError`] if allocation fails
     pub fn compute_syndromes_detached(parity: &[u8], data: &[u8]) -> Result<Buffer, BufferError> {
         (0..parity.len())
-            .map(|i| poly_eval_detached(parity, data, ANTILOG_TABLE[i + 1]))
+            .map(|i| poly_eval_detached(parity, data, ANTILOG_TABLE[i + 1].get()))
             .into_buffer()
     }
 
@@ -161,7 +161,7 @@ impl ReedSolomon {
         let (mut sigma, mut omega) = euclidean_for_rs(syndromes, parity)?;
 
         // Normalize sigma, omega
-        let scale = inv(sigma[0])?;
+        let scale = inv(sigma[0])?.get();
         sigma.iter_mut().for_each(|x| *x = mul(*x, scale));
         omega.iter_mut().for_each(|x| *x = mul(*x, scale));
 
@@ -171,7 +171,7 @@ impl ReedSolomon {
                 let x = if m == 0 {
                     1
                 } else {
-                    ANTILOG_TABLE[(255 - m) % 255]
+                    ANTILOG_TABLE[(255 - m) % 255].get()
                 };
                 poly_eval(&sigma, x) == 0
             })
@@ -187,7 +187,7 @@ impl ReedSolomon {
             let x = if j == 0 {
                 1
             } else {
-                ANTILOG_TABLE[(255 - j) % 255]
+                ANTILOG_TABLE[(255 - j) % 255].get()
             };
             let omega_x = poly_eval(&omega, x);
             let sigma_deriv_x = poly_eval_deriv(&sigma, x);
@@ -357,7 +357,7 @@ impl ReedSolomon {
 fn generate_generator_poly(num_roots: usize) -> Result<Buffer, PolynomialError> {
     let mut g = Buffer::from_slice([1])?;
     for i in 1..=num_roots {
-        let root = ANTILOG_TABLE[i];
+        let root = ANTILOG_TABLE[i].get();
         g = poly_mul(&g, &[root, 1])?; // x + α^i
     }
     Ok(g)
