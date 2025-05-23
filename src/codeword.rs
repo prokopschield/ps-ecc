@@ -51,3 +51,9 @@ impl<'lt> From<Buffer> for Codeword<'lt> {
         Self { codeword, range }
     }
 }
+
+impl<'lt> AsRef<[u8]> for Codeword<'lt> {
+    fn as_ref(&self) -> &[u8] {
+        self
+    }
+}
