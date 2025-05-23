@@ -6,7 +6,7 @@ description = "Generates Reed-Solomon error correction codes."
 license = "GPL-3.0-or-later"
 
 [dependencies]
-ps-buffer = "0.1.0-17"
+ps-buffer = "0.1.0-18"
 thiserror = "2.0.12"
 
 [profile.dev]
