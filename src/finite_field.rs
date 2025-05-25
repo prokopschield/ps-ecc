@@ -45,6 +45,11 @@ pub const fn add(a: u8, b: u8) -> u8 {
     a ^ b
 }
 
+/// Subtraction in GF(256) is also equivalent to xor
+pub const fn sub(a: u8, b: u8) -> u8 {
+    a ^ b
+}
+
 /// Multiplication in GF(256) using log tables.
 pub const fn mul(a: u8, b: u8) -> u8 {
     if a == 0 || b == 0 {

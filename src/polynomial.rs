@@ -2,7 +2,7 @@ use ps_buffer::{Buffer, ToBuffer};
 
 use crate::{
     error::PolynomialError,
-    finite_field::{add, div, mul},
+    finite_field::{add, div, mul, sub},
 };
 
 /// Multiplies two polynomials.
@@ -62,10 +62,19 @@ pub fn poly_rem(dividend: Buffer, divisor: &[u8]) -> Result<Buffer, PolynomialEr
 /// Polynomial division returning quotient and remainder.
 pub fn poly_div(dividend: &[u8], divisor: &[u8]) -> Result<(Buffer, Buffer), PolynomialError> {
     use PolynomialError::ZeroDivisor;
+
     let divisor_deg = degree(divisor).ok_or(ZeroDivisor)?;
     let divisor_lc = divisor[divisor_deg];
-    let mut quot = Buffer::alloc(dividend.len().saturating_sub(divisor.len()) + 1)?;
+
+    let dividend_deg = degree(dividend).unwrap_or(0);
+    let max_quot_deg = if dividend_deg >= divisor_deg {
+        dividend_deg - divisor_deg
+    } else {
+        0
+    };
+    let mut quot = Buffer::alloc(max_quot_deg + 1)?;
     let mut rem = dividend.to_buffer()?;
+
     while let Some(deg) = degree(&rem) {
         if deg < divisor_deg {
             break;
@@ -73,15 +82,22 @@ pub fn poly_div(dividend: &[u8], divisor: &[u8]) -> Result<(Buffer, Buffer), Pol
         let lead_coef = rem[deg];
         let ratio = div(lead_coef, divisor_lc)?;
         let shift = deg - divisor_deg;
+
+        // Assert that shift is within bounds
+        debug_assert!(shift < quot.len(), "Quotient index out of bounds");
+
         quot[shift] = ratio;
-        for (i, item) in divisor.iter().enumerate() {
+
+        // Subtract the scaled divisor from remainder
+        for (i, &divisor_coef) in divisor.iter().enumerate() {
             let idx = shift + i;
             if idx < rem.len() {
-                rem[idx] = add(rem[idx], mul(ratio, *item));
+                rem[idx] = sub(rem[idx], mul(ratio, divisor_coef));
             }
         }
         trim_leading_zeros(&mut rem);
     }
+
     trim_leading_zeros(&mut quot);
     Ok((quot, rem))
 }
@@ -123,4 +139,21 @@ fn degree(poly: &[u8]) -> Option<usize> {
 /// Removes leading zeros from a polynomial.
 fn trim_leading_zeros(poly: &mut Buffer) {
     poly.truncate(degree(poly).unwrap_or(1).saturating_add(1));
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::PolynomialError;
+
+    use super::poly_div;
+
+    #[test]
+    fn try_poly_div() -> Result<(), PolynomialError> {
+        let (q, r) = poly_div(&[1, 2, 3, 4, 5], &[1, 1, 0, 0])?;
+
+        assert_eq!(q.slice(..), &[0, 2, 1, 5]);
+        assert_eq!(r.slice(..), &[1]);
+
+        Ok(())
+    }
 }
