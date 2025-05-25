@@ -26,14 +26,21 @@ pub fn poly_eval(poly: &[u8], x: u8) -> u8 {
     result
 }
 
-pub fn poly_eval_detached(left: &[u8], right: &[u8], x: u8) -> u8 {
+/// Evaluates a polynomial split across two buffers at a given point.
+/// The polynomial is conceptually [`low_degree_terms` || `high_degree_terms`].
+/// This is equivalent to [`poly_eval`] but for when coefficients are stored
+/// in separate buffers (e.g., parity bytes and message bytes).
+pub fn poly_eval_detached(low_degree_terms: &[u8], high_degree_terms: &[u8], x: u8) -> u8 {
     let mut result = 0u8;
-    for &coef in right.iter().rev() {
+
+    for &coef in high_degree_terms.iter().rev() {
         result = add(mul(result, x), coef);
     }
-    for &coef in left.iter().rev() {
+
+    for &coef in low_degree_terms.iter().rev() {
         result = add(mul(result, x), coef);
     }
+
     result
 }
 
@@ -51,7 +58,7 @@ pub fn poly_rem(dividend: Buffer, divisor: &[u8]) -> Result<Buffer, PolynomialEr
         for (i, item) in divisor.iter().enumerate() {
             let idx = shift + i;
             if idx < rem.len() {
-                rem[idx] = add(rem[idx], mul(lead_coef, *item));
+                rem[idx] = sub(rem[idx], mul(lead_coef, *item));
             }
         }
         trim_leading_zeros(&mut rem);
@@ -118,15 +125,16 @@ pub fn poly_eval_deriv(poly: &[u8], x: u8) -> u8 {
 }
 
 /// Subtracts two polynomials (same as addition in GF(2)).
-#[allow(clippy::needless_range_loop)]
 pub fn poly_sub(p1: &[u8], p2: &[u8]) -> Result<Buffer, PolynomialError> {
     let len = p1.len().max(p2.len());
     let mut result = Buffer::alloc(len)?;
-    for i in 0..len {
+
+    for (i, coef) in result.iter_mut().enumerate() {
         let a = p1.get(i).copied().unwrap_or(0);
         let b = p2.get(i).copied().unwrap_or(0);
-        result[i] = add(a, b);
+        *coef = add(a, b);
     }
+
     trim_leading_zeros(&mut result);
     Ok(result)
 }
