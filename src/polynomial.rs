@@ -138,7 +138,7 @@ fn degree(poly: &[u8]) -> Option<usize> {
 
 /// Removes leading zeros from a polynomial.
 fn trim_leading_zeros(poly: &mut Buffer) {
-    poly.truncate(degree(poly).unwrap_or(1).saturating_add(1));
+    poly.truncate(degree(poly).unwrap_or(0).saturating_add(1));
 }
 
 #[cfg(test)]
