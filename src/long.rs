@@ -99,7 +99,7 @@ pub fn encode(
         .saturating_add(1);
     let full_length = base_len + parity_bytes * segment_count;
     let processed_length = full_length - parity_bytes;
-    let n = (processed_length - segment_length + segment_distance - 1) / segment_distance;
+    let n = (processed_length - segment_length).div_ceil(segment_distance);
     let last_segment_length = if processed_length >= n * segment_distance {
         processed_length - n * segment_distance
     } else {
