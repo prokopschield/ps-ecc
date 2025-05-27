@@ -1,6 +1,6 @@
 [package]
 name = "ps-ecc"
-version = "0.1.0-4"
+version = "0.1.0-5"
 edition = "2021"
 description = "Generates Reed-Solomon error correction codes."
 license = "GPL-3.0-or-later"
