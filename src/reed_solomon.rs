@@ -168,11 +168,7 @@ impl ReedSolomon {
         // Find error positions
         let error_positions: Vec<usize> = (0..length)
             .filter(|&m| {
-                let x = if m == 0 {
-                    1
-                } else {
-                    ANTILOG_TABLE[(255 - m) % 255].get()
-                };
+                let x = ANTILOG_TABLE[(255 - m) % 255].get();
                 poly_eval(&sigma, x) == 0
             })
             .collect();
