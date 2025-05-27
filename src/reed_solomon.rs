@@ -184,11 +184,7 @@ impl ReedSolomon {
         // Compute error values using Forney's formula
         let mut errors = Buffer::alloc(length)?;
         for &j in &error_positions {
-            let x = if j == 0 {
-                1
-            } else {
-                ANTILOG_TABLE[(255 - j) % 255].get()
-            };
+            let x = ANTILOG_TABLE[(255 - j) % 255].get();
             let omega_x = poly_eval(&omega, x);
             let sigma_deriv_x = poly_eval_deriv(&sigma, x);
             if sigma_deriv_x == 0 {
