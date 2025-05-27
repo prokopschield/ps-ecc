@@ -74,11 +74,7 @@ pub fn poly_div(dividend: &[u8], divisor: &[u8]) -> Result<(Buffer, Buffer), Pol
     let divisor_lc = divisor[divisor_deg];
 
     let dividend_deg = degree(dividend).unwrap_or(0);
-    let max_quot_deg = if dividend_deg >= divisor_deg {
-        dividend_deg - divisor_deg
-    } else {
-        0
-    };
+    let max_quot_deg = dividend_deg.saturating_sub(divisor_deg);
     let mut quot = Buffer::alloc(max_quot_deg + 1)?;
     let mut rem = dividend.to_buffer()?;
 
