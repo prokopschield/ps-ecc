@@ -10,6 +10,7 @@ use crate::polynomial::{
 };
 use crate::{Codeword, RSComputeErrorsError, RSEuclideanError, RSValidationError};
 
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ReedSolomon {
     parity: u8,
 }
