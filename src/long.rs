@@ -579,3 +579,287 @@ mod tests {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod encode_refactor_tests {
+    use super::*;
+    use ps_buffer::ToBuffer;
+
+    #[derive(thiserror::Error, Debug)]
+    enum TestError {
+        #[error(transparent)]
+        LongEccConstructor(#[from] LongEccConstructorError),
+        #[error(transparent)]
+        LongEccEncode(#[from] LongEccEncodeError),
+        #[error(transparent)]
+        LongEccDecode(#[from] LongEccDecodeError),
+        #[error(transparent)]
+        LongEccToBytes(#[from] LongEccToBytesError),
+        #[error(transparent)]
+        Buffer(#[from] ps_buffer::BufferError),
+    }
+
+    #[test]
+    fn test_encode_refactor_roundtrip_basic() -> Result<(), TestError> {
+        let message = b"Hello, World!".to_buffer()?;
+        let parity = 2;
+        let segment_length = 10;
+        let segment_distance = 8;
+
+        let encoded = encode(&message, parity, segment_length, segment_distance)?;
+        let decoded = decode(&encoded)?;
+
+        assert_eq!(&decoded[..], &message[..]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_encode_refactor_roundtrip_no_parity() -> Result<(), TestError> {
+        let message = b"No parity test".to_buffer()?;
+        let parity = 0;
+        let segment_length = 10;
+        let segment_distance = 5;
+
+        let encoded = encode(&message, parity, segment_length, segment_distance)?;
+        let decoded = decode(&encoded)?;
+
+        assert_eq!(&decoded[..], &message[..]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_encode_refactor_roundtrip_empty_message() -> Result<(), TestError> {
+        let message = b"".to_buffer()?;
+        let parity = 2;
+        let segment_length = 10;
+        let segment_distance = 8;
+
+        let encoded = encode(&message, parity, segment_length, segment_distance)?;
+        let decoded = decode(&encoded)?;
+
+        assert_eq!(&decoded[..], &message[..]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_encode_refactor_roundtrip_single_byte() -> Result<(), TestError> {
+        let message = b"X".to_buffer()?;
+        let parity = 1;
+        let segment_length = 8;
+        let segment_distance = 4;
+
+        let encoded = encode(&message, parity, segment_length, segment_distance)?;
+        let decoded = decode(&encoded)?;
+
+        assert_eq!(&decoded[..], &message[..]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_encode_refactor_roundtrip_large_message() -> Result<(), TestError> {
+        let message = vec![0x42u8; 1000].to_buffer()?;
+        let parity = 4;
+        let segment_length = 50;
+        let segment_distance = 40;
+
+        let encoded = encode(&message, parity, segment_length, segment_distance)?;
+        let decoded = decode(&encoded)?;
+
+        assert_eq!(&decoded[..], &message[..]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_encode_refactor_roundtrip_segment_length_equals_distance() -> Result<(), TestError> {
+        let message = b"Equal segments".to_buffer()?;
+        let parity = 2;
+        let segment_length = 10;
+        let segment_distance = 10;
+
+        let encoded = encode(&message, parity, segment_length, segment_distance)?;
+        let decoded = decode(&encoded)?;
+
+        assert_eq!(&decoded[..], &message[..]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_encode_refactor_roundtrip_segment_length_smaller_than_distance() -> Result<(), TestError>
+    {
+        let message = b"Small segments".to_buffer()?;
+        let parity = 2;
+        let segment_length = 5;
+        let segment_distance = 10;
+
+        let encoded = encode(&message, parity, segment_length, segment_distance)?;
+        let decoded = decode(&encoded)?;
+
+        assert_eq!(&decoded[..], &message[..]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_encode_refactor_roundtrip_zero_segment_distance() -> Result<(), TestError> {
+        let message = b"Zero distance".to_buffer()?;
+        let parity = 0;
+        let segment_length = 10;
+        let segment_distance = 0;
+
+        // This should fail with InvalidSegmentParityRatio
+        let result = encode(&message, parity, segment_length, segment_distance);
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn test_encode_refactor_roundtrip_max_parity() -> Result<(), TestError> {
+        let message = b"Max parity".to_buffer()?;
+        let parity = 32; // Below the 64 limit but still high
+        let segment_length = 69;
+        let segment_distance = 67;
+
+        let encoded = encode(&message, parity, segment_length, segment_distance)?;
+        let decoded = decode(&encoded)?;
+
+        assert_eq!(&decoded[..], &message[..]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_encode_refactor_roundtrip_min_parity() -> Result<(), TestError> {
+        let message = b"Min parity".to_buffer()?;
+        let parity = 1;
+        let segment_length = 10;
+        let segment_distance = 8;
+
+        let encoded = encode(&message, parity, segment_length, segment_distance)?;
+        let decoded = decode(&encoded)?;
+
+        assert_eq!(&decoded[..], &message[..]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_encode_refactor_roundtrip_exact_segment_fit() -> Result<(), TestError> {
+        // Message size that fits exactly into segments
+        let message = vec![0x42u8; 32].to_buffer()?; // 32 bytes message
+        let parity = 2;
+        let segment_length = 10;
+        let segment_distance = 8;
+        // With 8 bytes data per segment (10-2*2), 32 bytes needs exactly 4 segments
+
+        let encoded = encode(&message, parity, segment_length, segment_distance)?;
+        let decoded = decode(&encoded)?;
+
+        assert_eq!(&decoded[..], &message[..]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_encode_refactor_roundtrip_uneven_last_segment() -> Result<(), TestError> {
+        let message = b"This message will create an uneven last segment".to_buffer()?;
+        let parity = 3;
+        let segment_length = 15;
+        let segment_distance = 12;
+
+        let encoded = encode(&message, parity, segment_length, segment_distance)?;
+        let decoded = decode(&encoded)?;
+
+        assert_eq!(&decoded[..], &message[..]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_encode_refactor_roundtrip_header_only_message() -> Result<(), TestError> {
+        // Message that's smaller than header size
+        let message = b"Hi".to_buffer()?;
+        let parity = 1;
+        let segment_length = 20;
+        let segment_distance = 15;
+
+        let encoded = encode(&message, parity, segment_length, segment_distance)?;
+        let decoded = decode(&encoded)?;
+
+        assert_eq!(&decoded[..], &message[..]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_encode_refactor_roundtrip_high_parity_ratio() -> Result<(), TestError> {
+        let message = b"High parity ratio".to_buffer()?;
+        let parity = 3;
+        let segment_length = 10;
+        let segment_distance = 7; // parity (3) >= segment_distance (7) >> 1 (3)
+
+        // This should fail with InvalidSegmentParityRatio
+        let result = encode(&message, parity, segment_length, segment_distance);
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn test_encode_refactor_roundtrip_maximum_values() -> Result<(), TestError> {
+        let message = vec![0xFFu8; 100].to_buffer()?;
+        let parity = 63; // Maximum valid parity value
+        let segment_length = 255; // Near maximum u8 value
+        let segment_distance = 128;
+
+        let encoded = encode(&message, parity, segment_length, segment_distance)?;
+        let decoded = decode(&encoded)?;
+
+        assert_eq!(&decoded[..], &message[..]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_encode_refactor_consistent_header_fields() -> Result<(), TestError> {
+        let message = b"Header field consistency check".to_buffer()?;
+        let parity = 2;
+        let segment_length = 15;
+        let segment_distance = 12;
+
+        let encoded = encode(&message, parity, segment_length, segment_distance)?;
+        let header = LongEccHeader::from_bytes(&encoded)?;
+
+        // Check header fields are correctly set
+        assert_eq!(header.message_length as usize, message.len());
+        assert_eq!(header.parity, parity);
+        assert_eq!(header.segment_length, segment_length.max(segment_distance));
+        assert_eq!(header.segment_distance, segment_distance);
+        assert_eq!(header.full_length as usize, encoded.len());
+
+        // Decode and verify message integrity
+        let decoded = decode(&encoded)?;
+        assert_eq!(&decoded[..], &message[..]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_encode_refactor_segment_count_calculation() -> Result<(), TestError> {
+        // Test case where the original and refactored versions might differ in segment count calculation
+        let message = vec![0xAAu8; 50].to_buffer()?;
+        let parity = 2;
+        let segment_length = 12;
+        let segment_distance = 10;
+
+        let encoded = encode(&message, parity, segment_length, segment_distance)?;
+        let decoded = decode(&encoded)?;
+
+        assert_eq!(&decoded[..], &message[..]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_encode_refactor_edge_case_small_segment_distance() -> Result<(), TestError> {
+        let message = b"Small segment distance test".to_buffer()?;
+        let parity = 1;
+        let segment_length = 50;
+        let segment_distance = 4;
+
+        let encoded = encode(&message, parity, segment_length, segment_distance)?;
+        let decoded = decode(&encoded)?;
+
+        assert_eq!(&decoded[..], &message[..]);
+        Ok(())
+    }
+}
