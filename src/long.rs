@@ -22,6 +22,7 @@ pub struct LongEccHeader {
 }
 
 impl LongEccHeader {
+    /// Parse header from bytes with error correction
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, LongEccConstructorError> {
         if bytes.len() < HEADER_SIZE {
             return Err(LongEccConstructorError::InsufficientHeaderBytes(
@@ -29,34 +30,43 @@ impl LongEccHeader {
             ));
         }
 
-        let bytes = ReedSolomon::correct_detached(&bytes[12..16], &bytes[0..12])?;
+        // Extract data and parity portions
+        let data_bytes = &bytes[0..12];
+        let parity_bytes = &bytes[12..16];
+
+        // Correct errors in header data using Reed-Solomon
+        let corrected_data = ReedSolomon::correct_detached(parity_bytes, data_bytes)?;
 
         let header = Self {
-            full_length: u32::from_le_bytes(bytes[0..4].try_into()?),
-            message_length: u32::from_le_bytes(bytes[4..8].try_into()?),
-            parity: *bytes.get(8).unwrap_or(&0),
-            segment_length: *bytes.get(9).unwrap_or(&0),
-            segment_distance: *bytes.get(10).unwrap_or(&0),
-            last_segment_length: *bytes.get(11).unwrap_or(&0),
+            full_length: u32::from_le_bytes(corrected_data[0..4].try_into()?),
+            message_length: u32::from_le_bytes(corrected_data[4..8].try_into()?),
+            parity: corrected_data[8],
+            segment_length: corrected_data[9],
+            segment_distance: corrected_data[10],
+            last_segment_length: corrected_data[11],
         };
 
         Ok(header)
     }
 
+    /// Serialize header to bytes with Reed-Solomon parity
     #[inline]
     pub fn to_bytes(self) -> Result<[u8; HEADER_SIZE], LongEccToBytesError> {
         let mut bytes = [0u8; HEADER_SIZE];
 
-        bytes[0x0..0x4].copy_from_slice(&self.full_length.to_le_bytes());
-        bytes[0x4..0x8].copy_from_slice(&self.message_length.to_le_bytes());
-        bytes[0x8] = self.parity;
-        bytes[0x9] = self.segment_length;
-        bytes[0xA] = self.segment_distance;
-        bytes[0xB] = self.last_segment_length;
+        // Serialize header fields
+        bytes[0..4].copy_from_slice(&self.full_length.to_le_bytes());
+        bytes[4..8].copy_from_slice(&self.message_length.to_le_bytes());
+        bytes[8] = self.parity;
+        bytes[9] = self.segment_length;
+        bytes[10] = self.segment_distance;
+        bytes[11] = self.last_segment_length;
 
+        // Generate parity for header data
         let parity = ReedSolomon::new(2)?.generate_parity(&bytes[0..12])?;
 
-        bytes[0xC..=0xF].copy_from_slice(&parity);
+        // Append parity bytes
+        bytes[12..16].copy_from_slice(&parity);
 
         Ok(bytes)
     }
