@@ -17,7 +17,7 @@ impl<'lt> Codeword<'lt> {
     }
 }
 
-impl<'lt> Deref for Codeword<'lt> {
+impl Deref for Codeword<'_> {
     type Target = [u8];
 
     fn deref(&self) -> &Self::Target {
@@ -43,7 +43,7 @@ impl<'lt> From<&'lt [u8]> for Codeword<'lt> {
     }
 }
 
-impl<'lt> From<Buffer> for Codeword<'lt> {
+impl From<Buffer> for Codeword<'_> {
     fn from(value: Buffer) -> Self {
         let range = 0..value.len();
         let codeword = value.into();
@@ -52,7 +52,7 @@ impl<'lt> From<Buffer> for Codeword<'lt> {
     }
 }
 
-impl<'lt> AsRef<[u8]> for Codeword<'lt> {
+impl AsRef<[u8]> for Codeword<'_> {
     fn as_ref(&self) -> &[u8] {
         self
     }

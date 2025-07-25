@@ -24,11 +24,11 @@ pub const LOG_TABLE: [u8; FIELD_SIZE] = {
 
 /// Antilog table: `antilog_table[i] = α^i`
 pub const ANTILOG_TABLE: [NonZero<u8>; FIELD_SIZE] = {
-    let mut antilog = [unsafe { NonZero::<u8>::new_unchecked(1) }; FIELD_SIZE];
+    let mut antilog = [NonZero::<u8>::new(1).unwrap(); FIELD_SIZE];
     let mut current = 1u16; // Start with α^0 = 1
     let mut i = 0;
     while i < 255 {
-        antilog[i] = unsafe { NonZero::new_unchecked((current & 0xff) as u8) };
+        antilog[i] = NonZero::new((current & 0xff) as u8).unwrap();
         current <<= 1;
         if current & 0x100 != 0 {
             current ^= PRIMITIVE_POLY;

@@ -280,7 +280,7 @@ impl ReedSolomon {
 
         if let Some(_syndromes) = rs.validate(&corrected)? {
             return Err(RSDecodeError::TooManyErrors);
-        };
+        }
 
         let range = parity.len()..corrected.len();
         let codeword = Cow::Owned(corrected);

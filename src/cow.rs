@@ -8,7 +8,7 @@ pub enum Cow<'lt> {
     Owned(Buffer),
 }
 
-impl<'lt> Cow<'lt> {
+impl Cow<'_> {
     /// This method turns this [`Cow`] into a [`Buffer`].
     /// - In the case of [`Cow::Borrowed`], a new [`Buffer`] is allocated.
     /// - In the case of [`Cow::Owned`], the existing [`Buffer`] is returned.
@@ -22,7 +22,7 @@ impl<'lt> Cow<'lt> {
     }
 }
 
-impl<'lt> Deref for Cow<'lt> {
+impl Deref for Cow<'_> {
     type Target = [u8];
 
     fn deref(&self) -> &Self::Target {
@@ -39,7 +39,7 @@ impl<'lt> From<&'lt [u8]> for Cow<'lt> {
     }
 }
 
-impl<'lt> From<Buffer> for Cow<'lt> {
+impl From<Buffer> for Cow<'_> {
     fn from(value: Buffer) -> Self {
         Self::Owned(value)
     }
