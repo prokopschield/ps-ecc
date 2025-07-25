@@ -88,20 +88,13 @@ pub fn encode(
         return Err(InvalidSegmentParityRatio(segment_distance, parity));
     }
 
-    let segment_length = segment_length.max(segment_distance);
-
-    let mut header = LongEccHeader {
-        message_length: message.len().try_into()?,
-        parity,
-        segment_length,
-        segment_distance,
-        ..Default::default()
-    };
+    let segment_distance_u8 = segment_distance;
+    let segment_length_u8 = segment_length.max(segment_distance);
 
     let base_len = HEADER_SIZE + message.len();
     let parity_bytes = usize::from(parity << 1);
     let segment_distance = usize::from(segment_distance);
-    let segment_length = usize::from(segment_length);
+    let segment_length = usize::from(segment_length_u8);
     let new_bytes_per_segment = segment_distance - parity_bytes;
     let segment_count = base_len
         .saturating_sub(segment_length.saturating_sub(1))
@@ -116,8 +109,14 @@ pub fn encode(
         segment_length
     };
 
-    header.full_length = u32::try_from(full_length)?;
-    header.last_segment_length = u8::try_from(last_segment_length)?;
+    let header = LongEccHeader {
+        full_length: u32::try_from(full_length)?,
+        last_segment_length: u8::try_from(last_segment_length)?,
+        message_length: message.len().try_into()?,
+        parity,
+        segment_length: segment_length_u8,
+        segment_distance: segment_distance_u8,
+    };
 
     let mut codeword = Buffer::with_capacity(full_length)?;
 
