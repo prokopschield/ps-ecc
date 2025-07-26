@@ -1,6 +1,6 @@
 use std::ops::{Deref, Range};
 
-use ps_buffer::Buffer;
+use ps_buffer::{Buffer, SharedBuffer};
 
 use crate::cow::Cow;
 
@@ -45,6 +45,15 @@ impl<'lt> From<&'lt [u8]> for Codeword<'lt> {
 
 impl From<Buffer> for Codeword<'_> {
     fn from(value: Buffer) -> Self {
+        let range = 0..value.len();
+        let codeword = value.into();
+
+        Self { codeword, range }
+    }
+}
+
+impl From<SharedBuffer> for Codeword<'_> {
+    fn from(value: SharedBuffer) -> Self {
         let range = 0..value.len();
         let codeword = value.into();
 

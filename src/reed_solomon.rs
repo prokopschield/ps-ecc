@@ -283,7 +283,7 @@ impl ReedSolomon {
         }
 
         let range = parity.len()..corrected.len();
-        let codeword = Cow::Owned(corrected);
+        let codeword = Cow::Owned(corrected.share());
         let codeword = Codeword { codeword, range };
 
         Ok(codeword)

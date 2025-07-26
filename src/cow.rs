@@ -1,11 +1,11 @@
 use std::ops::Deref;
 
-use ps_buffer::{Buffer, BufferError};
+use ps_buffer::{Buffer, BufferError, SharedBuffer};
 
 #[derive(Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Cow<'lt> {
     Borrowed(&'lt [u8]),
-    Owned(Buffer),
+    Owned(SharedBuffer),
 }
 
 impl Cow<'_> {
@@ -14,9 +14,9 @@ impl Cow<'_> {
     /// - In the case of [`Cow::Owned`], the existing [`Buffer`] is returned.
     /// # Errors
     /// [`BufferError`] is returned if an allocation error occurs.
-    pub fn try_into_buffer(self) -> Result<Buffer, BufferError> {
+    pub fn try_into_buffer(self) -> Result<SharedBuffer, BufferError> {
         match self {
-            Cow::Borrowed(value) => Buffer::from_slice(value),
+            Cow::Borrowed(value) => Ok(Buffer::from_slice(value)?.share()),
             Cow::Owned(value) => Ok(value),
         }
     }
@@ -41,6 +41,12 @@ impl<'lt> From<&'lt [u8]> for Cow<'lt> {
 
 impl From<Buffer> for Cow<'_> {
     fn from(value: Buffer) -> Self {
+        Self::Owned(value.share())
+    }
+}
+
+impl From<SharedBuffer> for Cow<'_> {
+    fn from(value: SharedBuffer) -> Self {
         Self::Owned(value)
     }
 }
