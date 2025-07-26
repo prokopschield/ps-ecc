@@ -19,6 +19,8 @@ pub struct LongEccHeader {
     pub segment_length: u8,
     pub segment_distance: u8,
     pub last_segment_length: u8,
+    pub crc32: u32, // CRC32 of message bytes
+    pub xxh64: u64, // XXH64 of message + parity
 }
 
 impl LongEccHeader {
@@ -31,8 +33,8 @@ impl LongEccHeader {
         }
 
         // Extract data and parity portions
-        let data_bytes = &bytes[0..12];
-        let parity_bytes = &bytes[12..16];
+        let data_bytes = &bytes[0..24];
+        let parity_bytes = &bytes[24..32];
 
         // Correct errors in header data using Reed-Solomon
         let corrected_data = ReedSolomon::correct_detached(parity_bytes, data_bytes)?;
@@ -44,6 +46,8 @@ impl LongEccHeader {
             segment_length: corrected_data[9],
             segment_distance: corrected_data[10],
             last_segment_length: corrected_data[11],
+            crc32: u32::from_le_bytes(corrected_data[12..16].try_into()?),
+            xxh64: u64::from_le_bytes(corrected_data[16..24].try_into()?),
         };
 
         Ok(header)
@@ -61,15 +65,64 @@ impl LongEccHeader {
         bytes[9] = self.segment_length;
         bytes[10] = self.segment_distance;
         bytes[11] = self.last_segment_length;
+        bytes[12..16].copy_from_slice(&self.crc32.to_le_bytes());
+        bytes[16..24].copy_from_slice(&self.xxh64.to_le_bytes());
 
         // Generate parity for header data
-        let parity = ReedSolomon::new(2)?.generate_parity(&bytes[0..12])?;
+        let rs = ReedSolomon::new(4)?; // RS(32,8) - 24 data bytes + 8 parity bytes
+        let parity = rs.generate_parity(&bytes[0..24])?;
 
         // Append parity bytes
-        bytes[12..16].copy_from_slice(&parity);
+        bytes[24..32].copy_from_slice(&parity);
 
         Ok(bytes)
     }
+}
+
+/// Fast validation using checksums
+pub fn fast_validate(codeword: &[u8]) -> Result<bool, LongEccDecodeError> {
+    if codeword.len() < HEADER_SIZE {
+        return Ok(false);
+    }
+
+    let header = LongEccHeader::from_bytes(codeword)?;
+
+    // Validate CRC32 of message
+    let message_start = HEADER_SIZE;
+    let message_end = HEADER_SIZE + header.message_length as usize;
+
+    if message_end > codeword.len() {
+        return Ok(false);
+    }
+
+    let message = &codeword[message_start..message_end];
+    let calculated_crc32 = crc32(message);
+
+    if calculated_crc32 != header.crc32 {
+        return Ok(false);
+    }
+
+    // Validate XXH64 of message + parity
+
+    let calculated_xxh64 = xxh64(&codeword[HEADER_SIZE..]);
+
+    if calculated_xxh64 != header.xxh64 {
+        return Ok(false);
+    }
+
+    Ok(true)
+}
+
+/// Calculate CRC32 checksum
+fn crc32(data: &[u8]) -> u32 {
+    let mut hasher = crc32fast::Hasher::new();
+    hasher.update(data);
+    hasher.finalize()
+}
+
+/// Calculate XXH64 checksum
+fn xxh64(data: &[u8]) -> u64 {
+    xxhash_rust::xxh64::xxh64(data, 8_418_112_963_040_338_442)
 }
 
 /// Encode a message with long ECC protection
@@ -95,7 +148,7 @@ pub fn encode(
     let segment_length_u8 = segment_length.max(segment_distance);
 
     // Calculate encoding parameters
-    let base_len = HEADER_SIZE + message.len();
+    let base_len = message.len();
     let parity_bytes_per_segment = usize::from(parity << 1);
     let segment_distance = usize::from(segment_distance_u8);
     let segment_length = usize::from(segment_length_u8);
@@ -110,14 +163,17 @@ pub fn encode(
         .saturating_add(1);
 
     // Calculate total size
-    let full_length = base_len + parity_bytes_per_segment * segment_count;
-    let processed_length = full_length - parity_bytes_per_segment;
+    let full_length = HEADER_SIZE + base_len + parity_bytes_per_segment * segment_count;
+    let processed_length = full_length - parity_bytes_per_segment - HEADER_SIZE;
     let n = (processed_length.saturating_sub(segment_length)).div_ceil(segment_distance);
     let last_segment_length = if processed_length >= n * segment_distance {
         processed_length - n * segment_distance
     } else {
         segment_length
     };
+
+    // Calculate checksums
+    let crc32_checksum = crc32(message);
 
     // Create header
     let header = LongEccHeader {
@@ -127,6 +183,8 @@ pub fn encode(
         parity,
         segment_length: segment_length_u8,
         segment_distance: segment_distance_u8,
+        crc32: crc32_checksum,
+        xxh64: 0, // Will be calculated after parity generation
     };
 
     // Initialize output buffer
@@ -143,7 +201,7 @@ pub fn encode(
     // Generate parity for each segment
     let rs = ReedSolomon::new(parity)?;
 
-    let mut index: usize = 0;
+    let mut index: usize = HEADER_SIZE;
 
     loop {
         let segment_end = index.add(segment_length).min(codeword.len());
@@ -167,6 +225,18 @@ pub fn encode(
         }
     }
 
+    // Update XXH64 checksum
+    let xxh64_checksum = xxh64(&codeword[HEADER_SIZE..]);
+
+    // Rebuild header with correct XXH64
+    let header = LongEccHeader {
+        xxh64: xxh64_checksum,
+        ..header
+    };
+
+    // Update header in codeword
+    codeword[..HEADER_SIZE].copy_from_slice(&header.to_bytes()?);
+
     debug_assert_eq!(
         header.full_length as usize,
         codeword.len(),
@@ -180,8 +250,15 @@ pub fn encode(
 pub fn correct_in_place(codeword: &mut [u8]) -> Result<LongEccHeader, LongEccDecodeError> {
     use LongEccDecodeError::{InvalidCodeword, ReadDataError, ReadParityError};
 
+    // Fast path - skip correction if data is valid
+    if matches!(fast_validate(codeword), Ok(true)) {
+        return Ok(LongEccHeader::from_bytes(codeword)?);
+    }
+
+    // Parse and correct header
     let header = LongEccHeader::from_bytes(codeword)?;
 
+    // Extract parameters
     let parity_bytes = usize::from(header.parity) << 1;
     let last_segment_length = usize::from(header.last_segment_length);
     let segment_length = usize::from(header.segment_length);
@@ -199,7 +276,7 @@ pub fn correct_in_place(codeword: &mut [u8]) -> Result<LongEccHeader, LongEccDec
     ReedSolomon::correct_detached_in_place(mp, md)?;
 
     // Correct previous segments in reverse order
-    while data_index > 0 {
+    while data_index > HEADER_SIZE {
         // Move indices to previous segment
         data_index = data_index.saturating_sub(segment_distance);
         parity_index = parity_index.saturating_sub(parity_bytes);
@@ -266,7 +343,9 @@ mod tests {
             0x10, 0x00, 0x00, 0x00, // full length
             0x08, 0x00, 0x00, 0x00, // message length
             0x04, 0x0A, 0x05, 0x0B, // parity, seglen, segdist, lastseglen
-            0x2D, 0xE6, 0x64, 0x1A, // parity bytes
+            0x00, 0x00, 0x00, 0x00, // crc32
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // xxh64
+            0xe0, 0x20, 0x7e, 0x4f, 0xd1, 0xc0, 0xbf, 0xae, // parity bytes
         ];
 
         let header = LongEccHeader::from_bytes(&bytes)?;
@@ -290,6 +369,8 @@ mod tests {
             segment_length: 15,
             segment_distance: 7,
             last_segment_length: 18,
+            crc32: 0x1234_5678,
+            xxh64: 0x1234_5678_90AB_CDEF,
         };
         let bytes = header.to_bytes()?;
         assert_eq!(&bytes[0..4], &32u32.to_le_bytes());
@@ -298,6 +379,8 @@ mod tests {
         assert_eq!(bytes[9], 15);
         assert_eq!(bytes[10], 7);
         assert_eq!(bytes[11], 18);
+        assert_eq!(&bytes[12..16], &0x1234_5678u32.to_le_bytes());
+        assert_eq!(&bytes[16..24], &0x1234_5678_90AB_CDEFu64.to_le_bytes());
         Ok(())
     }
 
@@ -508,6 +591,8 @@ mod tests {
             segment_length: 8,
             segment_distance: 6,
             last_segment_length: 8,
+            crc32: 0,
+            xxh64: 0,
         };
         let mut truncated = header.to_bytes()?.to_vec();
         truncated.extend_from_slice(&[0u8; 5]); // Only 5 message bytes instead of 10
@@ -519,7 +604,7 @@ mod tests {
                 crate::RSDecodeError::RSComputeErrorsError(
                     crate::RSComputeErrorsError::TooManyErrors
                 )
-            )) // HEADER_SIZE + message_length = 12 + 10 = 22? No, 12 + 10 = 22. Header is 12. 12 + 10 = 22. Got 17.
+            ))
         ));
         Ok(())
     }
@@ -572,7 +657,7 @@ mod tests {
         let segment_length: u8 = 10;
         let segment_distance: u8 = 8;
         let encoded = encode(&message, parity, segment_length, segment_distance)?;
-        assert_eq!(encoded.len(), HEADER_SIZE + 3 * (usize::from(parity) << 1));
+        assert_eq!(encoded.len(), HEADER_SIZE + (usize::from(parity) << 1));
         let header = LongEccHeader::from_bytes(&encoded)?;
         assert_eq!(header.message_length, 0);
         assert_eq!(header.full_length as usize, encoded.len());

@@ -6,8 +6,10 @@ description = "Generates Reed-Solomon error correction codes."
 license = "GPL-3.0-or-later"
 
 [dependencies]
+crc32fast = "1.5.0"
 ps-buffer = "0.1.0-20"
 thiserror = "2.0.12"
+xxhash-rust = { version = "0.8.15", features = ["xxh64"] }
 
 [profile.dev]
 opt-level = 3
