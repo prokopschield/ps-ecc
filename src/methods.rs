@@ -38,6 +38,27 @@ pub fn decode(received: &[u8], parity: u8) -> Result<Codeword, DecodeError> {
     }
 }
 
+#[must_use]
+/// Validates that a received codeword isn't corrupted.
+pub fn validate(received: &[u8], parity: u8) -> bool {
+    if let Ok(length) = u8::try_from(received.len()) {
+        if parity > length >> 1 {
+            return false;
+        }
+
+        let Ok(rs) = ReedSolomon::new(parity) else {
+            return false;
+        };
+
+        match rs.validate(received) {
+            Ok(None) => true,
+            Ok(Some(_)) | Err(_) => false,
+        }
+    } else {
+        long::fast_validate(received).unwrap_or_default()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::EccError;
