@@ -72,6 +72,7 @@ impl LongEccHeader {
     }
 }
 
+/// Encode a message with long ECC protection
 pub fn encode(
     message: &[u8],
     parity: u8,
@@ -80,6 +81,7 @@ pub fn encode(
 ) -> Result<Buffer, LongEccEncodeError> {
     use LongEccEncodeError::{InvalidParity, InvalidSegmentParityRatio};
 
+    // Validate parameters
     if parity >= 64 {
         return Err(InvalidParity(parity));
     }
@@ -88,20 +90,28 @@ pub fn encode(
         return Err(InvalidSegmentParityRatio(segment_distance, parity));
     }
 
+    // Ensure segment_length is at least as large as segment_distance
     let segment_distance_u8 = segment_distance;
     let segment_length_u8 = segment_length.max(segment_distance);
 
+    // Calculate encoding parameters
     let base_len = HEADER_SIZE + message.len();
-    let parity_bytes = usize::from(parity << 1);
-    let segment_distance = usize::from(segment_distance);
+    let parity_bytes_per_segment = usize::from(parity << 1);
+    let segment_distance = usize::from(segment_distance_u8);
     let segment_length = usize::from(segment_length_u8);
-    let new_bytes_per_segment = segment_distance - parity_bytes;
+
+    // Calculate how many data bytes we can fit in each segment after parity
+    let new_bytes_per_segment = segment_distance.saturating_sub(parity_bytes_per_segment);
+
+    // Calculate number of segments needed
     let segment_count = base_len
         .saturating_sub(segment_length.saturating_sub(1))
         .div_ceil(new_bytes_per_segment)
         .saturating_add(1);
-    let full_length = base_len + parity_bytes * segment_count;
-    let processed_length = full_length - parity_bytes;
+
+    // Calculate total size
+    let full_length = base_len + parity_bytes_per_segment * segment_count;
+    let processed_length = full_length - parity_bytes_per_segment;
     let n = (processed_length.saturating_sub(segment_length)).div_ceil(segment_distance);
     let last_segment_length = if processed_length >= n * segment_distance {
         processed_length - n * segment_distance
@@ -109,6 +119,7 @@ pub fn encode(
         segment_length
     };
 
+    // Create header
     let header = LongEccHeader {
         full_length: u32::try_from(full_length)?,
         last_segment_length: u8::try_from(last_segment_length)?,
@@ -118,30 +129,38 @@ pub fn encode(
         segment_distance: segment_distance_u8,
     };
 
+    // Initialize output buffer
     let mut codeword = Buffer::with_capacity(full_length)?;
 
     codeword.extend_from_slice(header.to_bytes()?)?;
     codeword.extend_from_slice(message)?;
 
+    // Early return if no parity is requested
     if parity == 0 {
         return Ok(codeword);
     }
 
+    // Generate parity for each segment
     let rs = ReedSolomon::new(parity)?;
 
     let mut index: usize = 0;
 
     loop {
-        let next_segment = index..index.add(segment_length).min(codeword.len());
-        let next_segment_length = next_segment.end - next_segment.start;
+        let segment_end = index.add(segment_length).min(codeword.len());
+        let segment_length_actual = segment_end - index;
 
-        codeword.extend_from_slice(&rs.generate_parity(&codeword[next_segment])?)?;
+        // Generate and append parity for this segment
+        let parity_data = rs.generate_parity(&codeword[index..segment_end])?;
+        codeword.extend_from_slice(&parity_data)?;
+
+        // Move to next segment
         index += segment_distance;
 
-        if next_segment_length != segment_length {
+        // Break if we've processed the last segment
+        if segment_length_actual != segment_length {
             debug_assert_eq!(
-                header.last_segment_length as usize, next_segment_length,
-                "Next segment length doesn't match"
+                header.last_segment_length as usize, segment_length_actual,
+                "Segment length mismatch"
             );
 
             break;
@@ -151,7 +170,7 @@ pub fn encode(
     debug_assert_eq!(
         header.full_length as usize,
         codeword.len(),
-        "Full length doesn't match"
+        "Encoded length mismatch"
     );
 
     Ok(codeword)
