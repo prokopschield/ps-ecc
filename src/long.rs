@@ -176,6 +176,7 @@ pub fn encode(
     Ok(codeword)
 }
 
+/// Correct errors in-place in a codeword
 pub fn correct_in_place(codeword: &mut [u8]) -> Result<LongEccHeader, LongEccDecodeError> {
     use LongEccDecodeError::{InvalidCodeword, ReadDataError, ReadParityError};
 
@@ -193,22 +194,28 @@ pub fn correct_in_place(codeword: &mut [u8]) -> Result<LongEccHeader, LongEccDec
         return Err(InvalidCodeword);
     }
 
-    // last chunk
+    // Correct last chunk (data + parity)
     let (md, mp) = codeword[data_index..].split_at_mut(last_segment_length);
     ReedSolomon::correct_detached_in_place(mp, md)?;
 
+    // Correct previous segments in reverse order
     while data_index > 0 {
+        // Move indices to previous segment
         data_index = data_index.saturating_sub(segment_distance);
         parity_index = parity_index.saturating_sub(parity_bytes);
 
+        // Define ranges for data and parity
         let data_range = data_index..data_index + segment_length;
         let parity_range = ..parity_bytes;
 
+        // Split buffer at parity index
         let (data, parity) = codeword.split_at_mut(parity_index);
 
+        // Get mutable references to data and parity with bounds checking
         let parity = parity.get_mut(parity_range).ok_or(ReadParityError)?;
         let data = data.get_mut(data_range).ok_or(ReadDataError)?;
 
+        // Correct this segment
         ReedSolomon::correct_detached_in_place(parity, data)?;
     }
 
