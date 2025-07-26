@@ -881,3 +881,128 @@ mod encode_refactor_tests {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod correct_in_place_tests {
+    use super::*;
+    use ps_buffer::ToBuffer;
+
+    #[derive(thiserror::Error, Debug)]
+    enum TestError {
+        #[error(transparent)]
+        LongEccConstructor(#[from] LongEccConstructorError),
+        #[error(transparent)]
+        LongEccEncode(#[from] LongEccEncodeError),
+        #[error(transparent)]
+        LongEccDecode(#[from] LongEccDecodeError),
+        #[error(transparent)]
+        LongEccToBytes(#[from] LongEccToBytesError),
+        #[error(transparent)]
+        Buffer(#[from] ps_buffer::BufferError),
+    }
+
+    #[test]
+    fn test_correct_in_place_single_segment() -> Result<(), TestError> {
+        let message = b"Single segment test".to_buffer()?;
+        let parity = 2;
+        let segment_length = 30;
+        let segment_distance = 25;
+
+        let mut encoded = encode(&message, parity, segment_length, segment_distance)?;
+        let header = correct_in_place(&mut encoded)?;
+
+        assert_eq!(header.message_length as usize, message.len());
+        assert_eq!(
+            &encoded[HEADER_SIZE..HEADER_SIZE + message.len()],
+            &message[..]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_correct_in_place_multiple_segments() -> Result<(), TestError> {
+        let message =
+            b"This is a longer message that will span multiple segments for testing".to_buffer()?;
+        let parity = 3;
+        let segment_length = 20;
+        let segment_distance = 15;
+
+        let mut encoded = encode(&message, parity, segment_length, segment_distance)?;
+        let header = correct_in_place(&mut encoded)?;
+
+        assert_eq!(header.message_length as usize, message.len());
+        assert_eq!(
+            &encoded[HEADER_SIZE..HEADER_SIZE + message.len()],
+            &message[..]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_correct_in_place_error_correction_in_middle_segment() -> Result<(), TestError> {
+        let message =
+            b"Error correction in middle segment test with sufficient length".to_buffer()?;
+        let parity = 2;
+        let segment_length = 25;
+        let segment_distance = 20;
+
+        let mut encoded = encode(&message, parity, segment_length, segment_distance)?;
+
+        // Introduce an error in what should be a middle segment
+        let error_position = HEADER_SIZE + 30;
+        if error_position < encoded.len() {
+            encoded[error_position] ^= 0b0000_0001;
+        }
+
+        let header = correct_in_place(&mut encoded)?;
+        assert_eq!(header.message_length as usize, message.len());
+        assert_eq!(
+            &encoded[HEADER_SIZE..HEADER_SIZE + message.len()],
+            &message[..]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_correct_in_place_edge_case_two_segments() -> Result<(), TestError> {
+        let message = b"Two segment edge case".to_buffer()?;
+        let parity = 1;
+        let segment_length = 15;
+        let segment_distance = 12;
+
+        let mut encoded = encode(&message, parity, segment_length, segment_distance)?;
+        let header = correct_in_place(&mut encoded)?;
+
+        assert_eq!(header.message_length as usize, message.len());
+        assert_eq!(
+            &encoded[HEADER_SIZE..HEADER_SIZE + message.len()],
+            &message[..]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_correct_in_place_with_parity_errors() -> Result<(), TestError> {
+        let message = b"Parity error correction test".to_buffer()?;
+        let parity = 2;
+        let segment_length = 20;
+        let segment_distance = 16;
+
+        let mut encoded = encode(&message, parity, segment_length, segment_distance)?;
+
+        // Introduce errors in parity bytes of first segment
+        let parity_start = HEADER_SIZE + message.len();
+        if parity_start + 1 < encoded.len() {
+            encoded[parity_start] ^= 0b0000_0001;
+            encoded[parity_start + 1] ^= 0b0000_0010;
+        }
+
+        let header = correct_in_place(&mut encoded)?;
+        assert_eq!(header.message_length as usize, message.len());
+        assert_eq!(
+            &encoded[HEADER_SIZE..HEADER_SIZE + message.len()],
+            &message[..]
+        );
+        Ok(())
+    }
+}
