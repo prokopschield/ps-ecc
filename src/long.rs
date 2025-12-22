@@ -300,7 +300,7 @@ pub fn correct_in_place(codeword: &mut [u8]) -> Result<LongEccHeader, LongEccDec
 }
 
 /// Decode a codeword to extract the original message
-pub fn decode(codeword: &[u8]) -> Result<Codeword, LongEccDecodeError> {
+pub fn decode(codeword: &[u8]) -> Result<Codeword<'_>, LongEccDecodeError> {
     let mut buffer = Buffer::from_slice(codeword)?;
     let header = correct_in_place(&mut buffer)?;
 

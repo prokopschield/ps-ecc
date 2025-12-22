@@ -24,7 +24,7 @@ pub fn encode(message: &[u8], parity: u8) -> Result<Buffer, EncodeError> {
 /// - `InputTooLarge` is returned if `len(received)` > 255 bytes.
 /// - `InsufficientParityBytes` is returned if `parity > length / 2`.
 /// - `RSDecodeError` is returned if decoding fails for any reason.
-pub fn decode(received: &[u8], parity: u8) -> Result<Codeword, DecodeError> {
+pub fn decode(received: &[u8], parity: u8) -> Result<Codeword<'_>, DecodeError> {
     if let Ok(length) = u8::try_from(received.len()) {
         if parity > length >> 1 {
             return Err(DecodeError::InsufficientParityBytes(parity, length));
