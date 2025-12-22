@@ -200,9 +200,8 @@ impl ReedSolomon {
     pub fn correct<'lt>(&self, received: &'lt [u8]) -> Result<Cow<'lt>, RSDecodeError> {
         let syndromes = Self::compute_syndromes(self.parity_bytes(), received)?;
 
-        let errors = match self.compute_errors(received.len(), &syndromes)? {
-            None => return Ok(Cow::Borrowed(received)),
-            Some(errors) => errors,
+        let Some(errors) = self.compute_errors(received.len(), &syndromes)? else {
+            return Ok(Cow::Borrowed(received));
         };
 
         // Correct the received codeword
@@ -223,9 +222,8 @@ impl ReedSolomon {
     pub fn correct_in_place(&self, received: &mut [u8]) -> Result<(), RSDecodeError> {
         let syndromes = Self::compute_syndromes(self.parity_bytes(), received)?;
 
-        let errors = match self.compute_errors(received.len(), &syndromes)? {
-            None => return Ok(()),
-            Some(errors) => errors,
+        let Some(errors) = self.compute_errors(received.len(), &syndromes)? else {
+            return Ok(());
         };
 
         Self::apply_corrections(received, errors);
@@ -265,9 +263,8 @@ impl ReedSolomon {
 
         let syndromes = Self::compute_syndromes_detached(parity, data)?;
 
-        let errors = match Self::compute_errors_detached(num_parity, length, &syndromes)? {
-            None => return Ok(data.into()),
-            Some(errors) => errors,
+        let Some(errors) = Self::compute_errors_detached(num_parity, length, &syndromes)? else {
+            return Ok(data.into());
         };
 
         // Correct the received codeword
@@ -314,9 +311,8 @@ impl ReedSolomon {
 
         let syndromes = Self::compute_syndromes_detached(parity, data)?;
 
-        let errors = match Self::compute_errors_detached(num_parity, length, &syndromes)? {
-            None => return Ok(()),
-            Some(errors) => errors,
+        let Some(errors) = Self::compute_errors_detached(num_parity, length, &syndromes)? else {
+            return Ok(());
         };
 
         Self::apply_corrections_detached(parity, data, &errors);
