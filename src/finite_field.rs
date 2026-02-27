@@ -112,6 +112,8 @@ mod tests {
 
     #[test]
     fn antilog_nonzero() {
-        ANTILOG_TABLE.iter().for_each(|n| assert_ne!(n.get(), 0));
+        for n in &ANTILOG_TABLE {
+            assert_ne!(n.get(), 0);
+        }
     }
 }
