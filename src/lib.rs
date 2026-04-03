@@ -11,4 +11,5 @@ pub use codeword::Codeword;
 pub use cow::Cow;
 pub use error::*;
 pub use methods::*;
+pub use polynomial::Polynomial;
 pub use reed_solomon::ReedSolomon;
