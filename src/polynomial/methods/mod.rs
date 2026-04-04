@@ -1,3 +1,5 @@
+mod trim_degree;
+
 use ps_buffer::{Buffer, ToBuffer};
 
 use crate::{
