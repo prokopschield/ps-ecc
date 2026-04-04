@@ -1,5 +1,6 @@
 mod coefficients;
 mod degree;
+mod from_slice;
 mod set;
 mod trim_degree;
 

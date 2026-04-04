@@ -22,6 +22,12 @@ pub enum PolynomialError {
 }
 
 #[derive(Error, Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub enum PolynomialFromSliceError {
+    #[error("Slice was {size} bytes, max 255 allowed in GF(256).")]
+    TooLong { size: usize },
+}
+
+#[derive(Error, Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum RSConstructorError {
     #[error("Parity count must be <= 127.")]
     ParityTooHigh,
