@@ -1,3 +1,4 @@
+mod coefficients;
 mod degree;
 mod set;
 mod trim_degree;
