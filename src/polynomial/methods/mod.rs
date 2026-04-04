@@ -1,5 +1,6 @@
 mod coefficients;
 mod degree;
+mod eval_at;
 mod eval_coefficients_at;
 mod from_slice;
 mod set;
