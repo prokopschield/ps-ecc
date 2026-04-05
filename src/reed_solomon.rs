@@ -6,9 +6,9 @@ use crate::error::{
 };
 use crate::finite_field::{div, inv, mul, ANTILOG_TABLE};
 use crate::polynomial::{
-    poly_div, poly_eval, poly_eval_deriv, poly_eval_detached, poly_mul, poly_rem, poly_sub,
+    poly_div, poly_eval_deriv, poly_eval_detached, poly_mul, poly_rem, poly_sub,
 };
-use crate::{Codeword, RSComputeErrorsError, RSEuclideanError, RSValidationError};
+use crate::{Codeword, Polynomial, RSComputeErrorsError, RSEuclideanError, RSValidationError};
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ReedSolomon {
@@ -82,7 +82,7 @@ impl ReedSolomon {
         received: &[u8],
     ) -> Result<Buffer, BufferError> {
         (0..num_parity_bytes.into())
-            .map(|i| poly_eval(received, ANTILOG_TABLE[i + 1].get()))
+            .map(|i| Polynomial::eval_coefficients_at(received, ANTILOG_TABLE[i + 1].get()))
             .into_buffer()
     }
 
@@ -170,7 +170,7 @@ impl ReedSolomon {
         let error_positions: Vec<usize> = (0..length)
             .filter(|&m| {
                 let x = ANTILOG_TABLE[(255 - m) % 255].get();
-                poly_eval(&sigma, x) == 0
+                Polynomial::eval_coefficients_at(&sigma, x) == 0
             })
             .collect();
 
@@ -182,7 +182,7 @@ impl ReedSolomon {
         let mut errors = Buffer::alloc(length)?;
         for &j in &error_positions {
             let x = ANTILOG_TABLE[(255 - j) % 255].get();
-            let omega_x = poly_eval(&omega, x);
+            let omega_x = Polynomial::eval_coefficients_at(&omega, x);
             let sigma_deriv_x = poly_eval_deriv(&sigma, x);
             if sigma_deriv_x == 0 {
                 return Err(RSComputeErrorsError::ZeroErrorLocatorDerivative);

@@ -25,15 +25,6 @@ pub fn poly_mul(p1: &[u8], p2: &[u8]) -> Result<Buffer, PolynomialError> {
     Ok(result)
 }
 
-/// Evaluates a polynomial at a given point.
-pub fn poly_eval(poly: &[u8], x: u8) -> u8 {
-    let mut result = 0u8;
-    for &coef in poly.iter().rev() {
-        result = add(mul(result, x), coef);
-    }
-    result
-}
-
 /// Evaluates a polynomial split across two buffers at a given point.
 /// The polynomial is conceptually [`low_degree_terms` || `high_degree_terms`].
 /// This is equivalent to [`poly_eval`] but for when coefficients are stored
