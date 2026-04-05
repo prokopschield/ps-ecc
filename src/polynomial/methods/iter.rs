@@ -24,7 +24,7 @@ mod tests {
         let poly = Polynomial::try_from(&[4u8, 5, 6][..]).expect("valid polynomial");
         let mut sum = 0u8;
 
-        for &coef in poly.iter() {
+        for &coef in &poly {
             sum ^= coef;
         }
 
