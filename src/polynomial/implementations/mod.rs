@@ -7,4 +7,5 @@ mod index;
 mod into_iterator;
 mod ord;
 mod partial_ord;
+mod sub;
 mod try_from;
