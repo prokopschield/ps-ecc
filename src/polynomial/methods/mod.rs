@@ -7,6 +7,7 @@ mod eval_coefficients_at;
 mod eval_coefficients_derivative_at;
 mod eval_derivative_at;
 mod from_slice;
+mod iter;
 mod set;
 mod trim_degree;
 
