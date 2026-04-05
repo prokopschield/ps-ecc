@@ -1,4 +1,5 @@
 mod add;
+mod add_assign;
 mod bitxor;
 mod bitxor_assign;
 mod default;
