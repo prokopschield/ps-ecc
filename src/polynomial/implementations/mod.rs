@@ -5,6 +5,7 @@ mod bitxor_assign;
 mod default;
 mod index;
 mod into_iterator;
+mod mul;
 mod ord;
 mod partial_ord;
 mod sub;

@@ -28,6 +28,12 @@ pub enum PolynomialFromSliceError {
 }
 
 #[derive(Error, Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub enum PolynomialMulError {
+    #[error("Result degree exceeds maximum of 254.")]
+    DegreeOverflow,
+}
+
+#[derive(Error, Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum PolynomialXorError {
     #[error("Coefficient iterator exceeded maximum length of 255.")]
     TooManyCoefficients,
