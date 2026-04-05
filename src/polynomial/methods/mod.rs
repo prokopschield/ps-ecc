@@ -27,24 +27,6 @@ pub fn poly_mul(p1: &[u8], p2: &[u8]) -> Result<Buffer, PolynomialError> {
     Ok(result)
 }
 
-/// Evaluates a polynomial split across two buffers at a given point.
-/// The polynomial is conceptually [`low_degree_terms` || `high_degree_terms`].
-/// This is equivalent to [`poly_eval`] but for when coefficients are stored
-/// in separate buffers (e.g., parity bytes and message bytes).
-pub fn poly_eval_detached(low_degree_terms: &[u8], high_degree_terms: &[u8], x: u8) -> u8 {
-    let mut result = 0u8;
-
-    for &coef in high_degree_terms.iter().rev() {
-        result = add(mul(result, x), coef);
-    }
-
-    for &coef in low_degree_terms.iter().rev() {
-        result = add(mul(result, x), coef);
-    }
-
-    result
-}
-
 /// Computes the remainder of polynomial division.
 pub fn poly_rem(dividend: Buffer, divisor: &[u8]) -> Result<Buffer, PolynomialError> {
     use PolynomialError::ZeroDivisor;

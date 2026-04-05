@@ -5,9 +5,7 @@ use crate::error::{
     PolynomialError, RSConstructorError, RSDecodeError, RSEncodeError, RSGenerateParityError,
 };
 use crate::finite_field::{div, inv, mul, ANTILOG_TABLE};
-use crate::polynomial::{
-    poly_div, poly_eval_deriv, poly_eval_detached, poly_mul, poly_rem, poly_sub,
-};
+use crate::polynomial::{poly_div, poly_eval_deriv, poly_mul, poly_rem, poly_sub};
 use crate::{Codeword, Polynomial, RSComputeErrorsError, RSEuclideanError, RSValidationError};
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
@@ -91,7 +89,9 @@ impl ReedSolomon {
     /// - [`BufferError`] if allocation fails
     pub fn compute_syndromes_detached(parity: &[u8], data: &[u8]) -> Result<Buffer, BufferError> {
         (0..parity.len())
-            .map(|i| poly_eval_detached(parity, data, ANTILOG_TABLE[i + 1].get()))
+            .map(|i| {
+                Polynomial::eval_coefficient_slices_at(&[parity, data], ANTILOG_TABLE[i + 1].get())
+            })
             .into_buffer()
     }
 
