@@ -28,6 +28,12 @@ pub enum PolynomialFromSliceError {
 }
 
 #[derive(Error, Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub enum PolynomialXorError {
+    #[error("Coefficient iterator exceeded maximum length of 255.")]
+    TooManyCoefficients,
+}
+
+#[derive(Error, Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum RSConstructorError {
     #[error("Parity count must be <= 127.")]
     ParityTooHigh,
