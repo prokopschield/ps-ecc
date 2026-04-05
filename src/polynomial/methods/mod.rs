@@ -90,21 +90,6 @@ pub fn poly_div(dividend: &[u8], divisor: &[u8]) -> Result<(Buffer, Buffer), Pol
     Ok((quot, rem))
 }
 
-/// Evaluates the derivative of a polynomial at a point (in characteristic 2).
-pub fn poly_eval_deriv(poly: &[u8], x: u8) -> u8 {
-    let mut result = 0u8;
-    let x_sq = mul(x, x);
-    let mut x_pow = 1u8;
-    for k in 0..=((poly.len() - 1) / 2) {
-        let idx = 2 * k + 1;
-        if idx < poly.len() {
-            result = add(result, mul(poly[idx], x_pow));
-            x_pow = mul(x_pow, x_sq);
-        }
-    }
-    result
-}
-
 /// Subtracts two polynomials (same as addition in GF(2)).
 pub fn poly_sub(p1: &[u8], p2: &[u8]) -> Result<Buffer, PolynomialError> {
     let len = p1.len().max(p2.len());

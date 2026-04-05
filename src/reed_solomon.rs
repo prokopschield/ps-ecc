@@ -5,7 +5,7 @@ use crate::error::{
     PolynomialError, RSConstructorError, RSDecodeError, RSEncodeError, RSGenerateParityError,
 };
 use crate::finite_field::{div, inv, mul, ANTILOG_TABLE};
-use crate::polynomial::{poly_div, poly_eval_deriv, poly_mul, poly_rem, poly_sub};
+use crate::polynomial::{poly_div, poly_mul, poly_rem, poly_sub};
 use crate::{Codeword, Polynomial, RSComputeErrorsError, RSEuclideanError, RSValidationError};
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
@@ -183,7 +183,7 @@ impl ReedSolomon {
         for &j in &error_positions {
             let x = ANTILOG_TABLE[(255 - j) % 255].get();
             let omega_x = Polynomial::eval_coefficients_at(&omega, x);
-            let sigma_deriv_x = poly_eval_deriv(&sigma, x);
+            let sigma_deriv_x = Polynomial::eval_coefficients_derivative_at(&sigma, x);
             if sigma_deriv_x == 0 {
                 return Err(RSComputeErrorsError::ZeroErrorLocatorDerivative);
             }
