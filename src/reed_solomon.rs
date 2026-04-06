@@ -148,7 +148,7 @@ impl ReedSolomon {
     /// - `TooManyErrors` if the input is unrecoverable
     /// - `ZeroDerivative` shouldn't happen
     fn compute_errors_detached(
-        parity: impl Into<usize>,
+        parity: u8,
         length: usize,
         syndromes: &[u8],
     ) -> Result<Option<Buffer>, RSComputeErrorsError> {
@@ -257,9 +257,9 @@ impl ReedSolomon {
         data: &'lt [u8],
     ) -> Result<Codeword<'lt>, RSDecodeError> {
         let parity_bytes = parity.len();
-        let num_parity = parity_bytes >> 1;
+        let num_parity = u8::try_from(parity_bytes >> 1)?;
         let length = parity_bytes + data.len();
-        let rs = Self::new(num_parity.try_into()?)?;
+        let rs = Self::new(num_parity)?;
 
         let syndromes = Self::compute_syndromes_detached(parity, data)?;
 
@@ -306,7 +306,7 @@ impl ReedSolomon {
         data: &mut [u8],
     ) -> Result<(), RSDecodeError> {
         let parity_bytes = parity.len();
-        let num_parity = parity_bytes >> 1;
+        let num_parity = u8::try_from(parity_bytes >> 1)?;
         let length = parity_bytes + data.len();
 
         let syndromes = Self::compute_syndromes_detached(parity, data)?;
