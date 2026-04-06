@@ -3,6 +3,7 @@ mod add_assign;
 mod as_ref;
 mod bitxor;
 mod bitxor_assign;
+mod debug;
 mod default;
 mod div;
 mod hash;
