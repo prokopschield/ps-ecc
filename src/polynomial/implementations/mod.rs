@@ -10,6 +10,7 @@ mod into_iterator;
 mod mul;
 mod ord;
 mod partial_ord;
+mod rem;
 mod sub;
 mod sub_assign;
 mod try_from;
