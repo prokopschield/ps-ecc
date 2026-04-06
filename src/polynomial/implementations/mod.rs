@@ -8,6 +8,7 @@ mod div;
 mod index;
 mod into_iterator;
 mod mul;
+mod mul_assign;
 mod ord;
 mod partial_ord;
 mod rem;
