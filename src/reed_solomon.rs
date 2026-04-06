@@ -4,9 +4,9 @@ use crate::cow::Cow;
 use crate::error::{
     PolynomialError, RSConstructorError, RSDecodeError, RSEncodeError, RSGenerateParityError,
 };
-use crate::finite_field::{div, inv, mul, ANTILOG_TABLE};
-use crate::polynomial::{poly_div, poly_mul, poly_rem, poly_sub};
-use crate::{Codeword, Polynomial, RSComputeErrorsError, RSEuclideanError, RSValidationError};
+use crate::finite_field::{div, inv, ANTILOG_TABLE};
+use crate::polynomial::{poly_mul, poly_rem};
+use crate::{euclidean, Codeword, Polynomial, RSComputeErrorsError, RSValidationError};
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ReedSolomon {
@@ -144,7 +144,7 @@ impl ReedSolomon {
     /// # Errors
     /// - [`ps_buffer::BufferError`] is returned if memory allocation fails.
     /// - `GFError` if an arithmetic operation fails
-    /// - `PolynomialError` if `euclidean_for_rs` fails (division by zero)
+    /// - `EuclideanError` if `euclidean` fails (division by zero)
     /// - `TooManyErrors` if the input is unrecoverable
     /// - `ZeroDerivative` shouldn't happen
     fn compute_errors_detached(
@@ -156,25 +156,24 @@ impl ReedSolomon {
             return Ok(None);
         }
 
-        let parity = parity.into();
-
         // Euclidean algorithm to find error locator and evaluator polynomials
-        let (mut sigma, mut omega) = euclidean_for_rs(syndromes, parity)?;
+        let (mut sigma, mut omega) = euclidean(syndromes, parity)?;
 
         // Normalize sigma, omega
-        let scale = inv(sigma[0])?.get();
-        sigma.iter_mut().for_each(|x| *x = mul(*x, scale));
-        omega.iter_mut().for_each(|x| *x = mul(*x, scale));
+        let scale = inv(sigma.coefficients()[0])?.get();
+
+        sigma *= scale;
+        omega *= scale;
 
         // Find error positions
         let error_positions: Vec<usize> = (0..length)
             .filter(|&m| {
                 let x = ANTILOG_TABLE[(255 - m) % 255].get();
-                Polynomial::eval_coefficients_at(&sigma, x) == 0
+                Polynomial::eval_at(&sigma, x) == 0
             })
             .collect();
 
-        if error_positions.len() > parity || error_positions.is_empty() {
+        if error_positions.len() > usize::from(parity) || error_positions.is_empty() {
             return Err(RSComputeErrorsError::TooManyErrors);
         }
 
@@ -182,8 +181,8 @@ impl ReedSolomon {
         let mut errors = Buffer::alloc(length)?;
         for &j in &error_positions {
             let x = ANTILOG_TABLE[(255 - j) % 255].get();
-            let omega_x = Polynomial::eval_coefficients_at(&omega, x);
-            let sigma_deriv_x = Polynomial::eval_coefficients_derivative_at(&sigma, x);
+            let omega_x = Polynomial::eval_at(&omega, x);
+            let sigma_deriv_x = Polynomial::eval_derivative_at(&sigma, x);
             if sigma_deriv_x == 0 {
                 return Err(RSComputeErrorsError::ZeroErrorLocatorDerivative);
             }
@@ -350,28 +349,6 @@ fn generate_generator_poly(num_roots: usize) -> Result<Buffer, PolynomialError> 
         g = poly_mul(&g, &[root, 1])?; // x + α^i
     }
     Ok(g)
-}
-
-/// Extended Euclidean algorithm for Reed-Solomon decoding.
-fn euclidean_for_rs(s: &[u8], t: usize) -> Result<(Buffer, Buffer), RSEuclideanError> {
-    let mut r0 = Buffer::alloc(2 * t + 1)?;
-    r0[2 * t] = 1; // x^{2t}
-    let mut r1 = s.to_buffer()?;
-    let mut t0 = Buffer::from_slice([0])?;
-    let mut t1 = Buffer::from_slice([1])?;
-    while degree(&r1).unwrap_or(0) >= t {
-        let (q, r) = poly_div(&r0, &r1)?;
-        let new_t1 = poly_sub(&t0, &poly_mul(&q, &t1)?)?;
-        t0 = t1;
-        t1 = new_t1;
-        r0 = r1;
-        r1 = r;
-    }
-    Ok((t1, r1))
-}
-
-fn degree(poly: &[u8]) -> Option<usize> {
-    poly.iter().rposition(|&x| x != 0)
 }
 
 #[cfg(test)]

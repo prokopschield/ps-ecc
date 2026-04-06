@@ -14,11 +14,11 @@ mod mul_xor_assign;
 mod set;
 mod trim_degree;
 
-use ps_buffer::{Buffer, ToBuffer};
+use ps_buffer::Buffer;
 
 use crate::{
     error::PolynomialError,
-    finite_field::{add, div, mul, sub},
+    finite_field::{add, mul, sub},
 };
 
 /// Multiplies two polynomials.
@@ -55,60 +55,6 @@ pub fn poly_rem(dividend: Buffer, divisor: &[u8]) -> Result<Buffer, PolynomialEr
     Ok(rem)
 }
 
-/// Polynomial division returning quotient and remainder.
-pub fn poly_div(dividend: &[u8], divisor: &[u8]) -> Result<(Buffer, Buffer), PolynomialError> {
-    use PolynomialError::ZeroDivisor;
-
-    let divisor_deg = degree(divisor).ok_or(ZeroDivisor)?;
-    let divisor_lc = divisor[divisor_deg];
-
-    let dividend_deg = degree(dividend).unwrap_or(0);
-    let max_quot_deg = dividend_deg.saturating_sub(divisor_deg);
-    let mut quot = Buffer::alloc(max_quot_deg + 1)?;
-    let mut rem = dividend.to_buffer()?;
-
-    while let Some(deg) = degree(&rem) {
-        if deg < divisor_deg {
-            break;
-        }
-        let lead_coef = rem[deg];
-        let ratio = div(lead_coef, divisor_lc)?;
-        let shift = deg - divisor_deg;
-
-        // Assert that shift is within bounds
-        debug_assert!(shift < quot.len(), "Quotient index out of bounds");
-
-        quot[shift] = ratio;
-
-        // Subtract the scaled divisor from remainder
-        for (i, &divisor_coef) in divisor.iter().enumerate() {
-            let idx = shift + i;
-            if idx < rem.len() {
-                rem[idx] = sub(rem[idx], mul(ratio, divisor_coef));
-            }
-        }
-        trim_leading_zeros(&mut rem);
-    }
-
-    trim_leading_zeros(&mut quot);
-    Ok((quot, rem))
-}
-
-/// Subtracts two polynomials (same as addition in GF(2)).
-pub fn poly_sub(p1: &[u8], p2: &[u8]) -> Result<Buffer, PolynomialError> {
-    let len = p1.len().max(p2.len());
-    let mut result = Buffer::alloc(len)?;
-
-    for (i, coef) in result.iter_mut().enumerate() {
-        let a = p1.get(i).copied().unwrap_or(0);
-        let b = p2.get(i).copied().unwrap_or(0);
-        *coef = add(a, b);
-    }
-
-    trim_leading_zeros(&mut result);
-    Ok(result)
-}
-
 /// Computes the degree of a polynomial.
 fn degree(poly: &[u8]) -> Option<usize> {
     poly.iter().rposition(|&x| x != 0)
@@ -117,21 +63,4 @@ fn degree(poly: &[u8]) -> Option<usize> {
 /// Removes leading zeros from a polynomial.
 fn trim_leading_zeros(poly: &mut Buffer) {
     poly.truncate(degree(poly).unwrap_or(0).saturating_add(1));
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::PolynomialError;
-
-    use super::poly_div;
-
-    #[test]
-    fn try_poly_div() -> Result<(), PolynomialError> {
-        let (q, r) = poly_div(&[1, 2, 3, 4, 5], &[1, 1, 0, 0])?;
-
-        assert_eq!(q.slice(..), &[0, 2, 1, 5]);
-        assert_eq!(r.slice(..), &[1]);
-
-        Ok(())
-    }
 }
