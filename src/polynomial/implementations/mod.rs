@@ -4,6 +4,7 @@ mod as_ref;
 mod bitxor;
 mod bitxor_assign;
 mod default;
+mod div;
 mod index;
 mod into_iterator;
 mod mul;
