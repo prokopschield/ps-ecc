@@ -12,6 +12,7 @@ mod from_slice;
 mod iter;
 mod mul_xor_assign;
 mod set;
+mod set_coefficients;
 mod trim_degree;
 
 use ps_buffer::Buffer;

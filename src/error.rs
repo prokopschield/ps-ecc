@@ -28,6 +28,12 @@ pub enum PolynomialFromSliceError {
 }
 
 #[derive(Error, Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub enum PolynomialSetCoefficientsError {
+    #[error("Range {offset}..{end} exceeds maximum coefficient index 254.")]
+    OutOfBounds { offset: u8, end: usize },
+}
+
+#[derive(Error, Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum PolynomialMulError {
     #[error("Result degree exceeds maximum of 254.")]
     DegreeOverflow,
