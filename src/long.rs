@@ -4,7 +4,7 @@ use ps_buffer::Buffer;
 
 use crate::{
     codeword::Codeword, LongEccConstructorError, LongEccDecodeError, LongEccEncodeError,
-    LongEccToBytesError, ReedSolomon,
+    LongEccToBytesError, ReedSolomon, MAX_PARITY, MAX_PARITY_BYTES,
 };
 
 const HEADER_SIZE: usize = std::mem::size_of::<LongEccHeader>();
@@ -135,7 +135,7 @@ pub fn encode(
     use LongEccEncodeError::{InvalidParity, InvalidSegmentParityRatio};
 
     // Validate parameters
-    if parity >= 64 {
+    if parity > MAX_PARITY {
         return Err(InvalidParity(parity));
     }
 
@@ -267,7 +267,7 @@ pub fn correct_in_place(codeword: &mut [u8]) -> Result<LongEccHeader, LongEccDec
     let mut parity_index = codeword.len().saturating_sub(parity_bytes);
     let mut data_index = parity_index.saturating_sub(last_segment_length);
 
-    let excessive_parity = parity_bytes >= segment_distance.min(127);
+    let excessive_parity = parity_bytes >= segment_distance.min(MAX_PARITY_BYTES as usize);
     let excessive_last_segment_length = last_segment_length > segment_length;
 
     if excessive_parity || excessive_last_segment_length {
@@ -913,7 +913,7 @@ mod encode_refactor_tests {
     #[test]
     fn test_encode_refactor_roundtrip_maximum_values() -> Result<(), TestError> {
         let message = vec![0xFFu8; 100].to_buffer()?;
-        let parity = 63; // Maximum valid parity value
+        let parity = MAX_PARITY;
         let segment_length = 255; // Near maximum u8 value
         let segment_distance = 128;
 

@@ -65,7 +65,7 @@ pub enum EuclideanError {
 
 #[derive(Error, Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum RSConstructorError {
-    #[error("Parity count must be <= 127.")]
+    #[error("Parity count must be <= 63.")]
     ParityTooHigh,
 }
 

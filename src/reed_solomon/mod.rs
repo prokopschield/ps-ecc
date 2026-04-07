@@ -1,3 +1,6 @@
+mod constants;
+
+pub use constants::*;
 use ps_buffer::{Buffer, BufferError, ByteIteratorIntoBuffer, ToBuffer};
 
 use crate::cow::Cow;
@@ -16,11 +19,11 @@ pub struct ReedSolomon {
 impl ReedSolomon {
     /// Creates a new Reed-Solomon codec with parameters n and k.
     /// # Errors
-    /// - `ParityTooHigh` is returned if parity > 127
+    /// - `ParityTooHigh` is returned if parity > `MAX_PARITY`
     pub const fn new(parity: u8) -> Result<Self, RSConstructorError> {
         use RSConstructorError::ParityTooHigh;
 
-        if parity > 127 {
+        if parity > MAX_PARITY {
             return Err(ParityTooHigh);
         }
 
@@ -469,8 +472,8 @@ mod tests {
     fn test_new() {
         assert!(ReedSolomon::new(0).is_ok());
         assert!(ReedSolomon::new(10).is_ok());
-        assert!(ReedSolomon::new(127).is_ok());
-        assert!(ReedSolomon::new(128).is_err());
+        assert!(ReedSolomon::new(MAX_PARITY).is_ok());
+        assert!(ReedSolomon::new(MAX_PARITY + 1).is_err());
     }
 
     #[test]

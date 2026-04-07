@@ -14,4 +14,4 @@ pub use error::*;
 pub use euclidean::euclidean;
 pub use methods::*;
 pub use polynomial::Polynomial;
-pub use reed_solomon::ReedSolomon;
+pub use reed_solomon::*;
