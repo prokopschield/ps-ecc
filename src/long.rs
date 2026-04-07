@@ -267,7 +267,10 @@ pub fn correct_in_place(codeword: &mut [u8]) -> Result<LongEccHeader, LongEccDec
     let mut parity_index = codeword.len().saturating_sub(parity_bytes);
     let mut data_index = parity_index.saturating_sub(last_segment_length);
 
-    if parity_bytes >= segment_distance.min(127) || last_segment_length > segment_length {
+    let excessive_parity = parity_bytes >= segment_distance.min(127);
+    let excessive_last_segment_length = last_segment_length > segment_length;
+
+    if excessive_parity || excessive_last_segment_length {
         return Err(InvalidCodeword);
     }
 
