@@ -1,14 +1,14 @@
 mod constants;
+mod generator;
 
 pub use constants::*;
+use generator::generator_poly;
 use ps_buffer::{Buffer, BufferError, ByteIteratorIntoBuffer, ToBuffer};
 
 use crate::cow::Cow;
-use crate::error::{
-    PolynomialError, RSConstructorError, RSDecodeError, RSEncodeError, RSGenerateParityError,
-};
+use crate::error::{RSConstructorError, RSDecodeError, RSEncodeError, RSGenerateParityError};
 use crate::finite_field::{div, inv, ANTILOG_TABLE};
-use crate::polynomial::{poly_mul, poly_rem};
+use crate::polynomial::poly_rem;
 use crate::{euclidean, Codeword, Polynomial, RSComputeErrorsError, RSValidationError};
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
@@ -50,12 +50,12 @@ impl ReedSolomon {
     /// - `PolynomialError` if generator polynomial is zero (shouldn't happen)
     pub fn generate_parity(&self, message: &[u8]) -> Result<Buffer, RSGenerateParityError> {
         let num_parity = usize::from(self.parity_bytes());
-        let g = generate_generator_poly(num_parity)?;
+        let g = generator_poly(self.parity());
         let dividend = vec![0u8; num_parity]
             .into_iter()
             .chain(message.iter().copied())
             .into_buffer()?;
-        let mut r = poly_rem(dividend, &g)?;
+        let mut r = poly_rem(dividend, g)?;
         if r.len() != num_parity {
             r.resize(num_parity, 0)?;
         }
@@ -343,17 +343,6 @@ impl ReedSolomon {
     }
 }
 
-/// Generates the generator polynomial `g(x)` = `(x - α^1)(x - α^2)`...`(x - α^num_roots`).
-#[allow(clippy::needless_range_loop)]
-fn generate_generator_poly(num_roots: usize) -> Result<Buffer, PolynomialError> {
-    let mut g = Buffer::from_slice([1])?;
-    for i in 1..=num_roots {
-        let root = ANTILOG_TABLE[i].get();
-        g = poly_mul(&g, &[root, 1])?; // x + α^i
-    }
-    Ok(g)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -365,7 +354,7 @@ mod tests {
         #[error(transparent)]
         Buffer(#[from] ps_buffer::BufferError),
         #[error(transparent)]
-        Polynomial(#[from] PolynomialError),
+        Polynomial(#[from] crate::PolynomialError),
         #[error(transparent)]
         RSConstructor(#[from] RSConstructorError),
         #[error(transparent)]
