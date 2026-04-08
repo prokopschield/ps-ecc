@@ -19,20 +19,8 @@ use ps_buffer::Buffer;
 
 use crate::{
     error::PolynomialError,
-    finite_field::{add, mul, sub},
+    finite_field::{mul, sub},
 };
-
-/// Multiplies two polynomials.
-pub fn poly_mul(p1: &[u8], p2: &[u8]) -> Result<Buffer, PolynomialError> {
-    let mut result = Buffer::alloc(p1.len() + p2.len() - 1)?;
-    for i in 0..p1.len() {
-        for j in 0..p2.len() {
-            result[i + j] = add(result[i + j], mul(p1[i], p2[j]));
-        }
-    }
-    trim_leading_zeros(&mut result);
-    Ok(result)
-}
 
 /// Computes the remainder of polynomial division.
 pub fn poly_rem(dividend: Buffer, divisor: &[u8]) -> Result<Buffer, PolynomialError> {
