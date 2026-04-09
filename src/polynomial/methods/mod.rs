@@ -8,6 +8,7 @@ mod eval_coefficient_slices_at;
 mod eval_coefficients_at;
 mod eval_coefficients_derivative_at;
 mod eval_derivative_at;
+mod first_n_coefficients;
 mod from_slice;
 mod iter;
 mod mul_xor_assign;
