@@ -153,6 +153,9 @@ impl ReedSolomon {
         length: usize,
         syndromes: &[u8],
     ) -> Result<Option<Buffer>, RSComputeErrorsError> {
+        // TODO: refactor to accept u8 length parameter
+        let length = u8::try_from(length).expect("BUG: input too long");
+
         if syndromes.iter().all(|&syndrome| syndrome == 0) {
             return Ok(None);
         }
@@ -167,20 +170,34 @@ impl ReedSolomon {
         omega *= scale;
 
         // Find error positions
-        let error_positions: Vec<usize> = (0..length)
-            .filter(|&m| {
-                let x = ANTILOG_TABLE[(255 - m) % 255].get();
-                Polynomial::eval_at(&sigma, x) == 0
-            })
-            .collect();
+        let mut error_positions = [0u8; MAX_PARITY as usize];
+        let mut num_errors = 0usize;
 
-        if error_positions.len() > usize::from(parity) || error_positions.is_empty() {
+        for m in 0..length {
+            let x = ANTILOG_TABLE[(255 - m as usize) % 255].get();
+            if Polynomial::eval_at(&sigma, x) == 0 {
+                if num_errors >= usize::from(parity) {
+                    return Err(RSComputeErrorsError::TooManyErrors);
+                }
+
+                error_positions[num_errors] = m;
+                num_errors += 1;
+            }
+        }
+
+        if num_errors == 0 {
             return Err(RSComputeErrorsError::TooManyErrors);
         }
 
+        let error_positions = error_positions
+            .iter()
+            .copied()
+            .map(usize::from)
+            .take(num_errors);
+
         // Compute error values using Forney's formula
-        let mut errors = Buffer::alloc(length)?;
-        for &j in &error_positions {
+        let mut errors = Buffer::alloc(length as usize)?;
+        for j in error_positions {
             let x = ANTILOG_TABLE[(255 - j) % 255].get();
             let omega_x = Polynomial::eval_at(&omega, x);
             let sigma_deriv_x = Polynomial::eval_derivative_at(&sigma, x);
