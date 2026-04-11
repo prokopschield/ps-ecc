@@ -3,7 +3,6 @@ mod implementations;
 mod methods;
 
 use constants::POLYNOMIAL_MAX_COEFFICIENTS;
-pub use methods::poly_rem;
 
 #[derive(Clone, Copy, Eq)]
 pub struct Polynomial {

@@ -1,6 +1,8 @@
 mod constants;
 mod generator;
 
+use std::ops::Rem;
+
 pub use constants::*;
 use generator::generator_poly;
 use ps_buffer::{Buffer, BufferError, ByteIteratorIntoBuffer, ToBuffer};
@@ -8,7 +10,6 @@ use ps_buffer::{Buffer, BufferError, ByteIteratorIntoBuffer, ToBuffer};
 use crate::cow::Cow;
 use crate::error::{RSConstructorError, RSDecodeError, RSEncodeError, RSGenerateParityError};
 use crate::finite_field::{div, inv, ANTILOG_TABLE};
-use crate::polynomial::poly_rem;
 use crate::{euclidean, Codeword, Polynomial, RSComputeErrorsError, RSValidationError};
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
@@ -47,25 +48,22 @@ impl ReedSolomon {
     /// Generates parity bytes.
     /// # Errors
     /// - `BufferError` if an allocation fails
-    /// - `PolynomialError` if generator polynomial is zero (shouldn't happen)
+    /// - [`RSGenerateParityError::Division`] if generator polynomial is zero (shouldn't happen)
     pub fn generate_parity(&self, message: &[u8]) -> Result<Buffer, RSGenerateParityError> {
-        let num_parity = usize::from(self.parity_bytes());
-        let g = generator_poly(self.parity());
-        let dividend = vec![0u8; num_parity]
-            .into_iter()
-            .chain(message.iter().copied())
-            .into_buffer()?;
-        let mut r = poly_rem(dividend, g)?;
-        if r.len() != num_parity {
-            r.resize(num_parity, 0)?;
-        }
-        Ok(r)
+        let mut p = Polynomial::default();
+
+        p.set_coefficients(self.parity_bytes(), message)?;
+
+        p.rem(generator_poly(self.parity()))?
+            .first_n_coefficients(self.parity_bytes().into())
+            .to_buffer()
+            .map_err(Into::into)
     }
 
     /// Encodes a message into a codeword.
     /// # Errors
     /// - [`ps_buffer::BufferError`] is returned if memory allocation fails.
-    /// - `PolynomialError` if generator polynomial is zero (shouldn't happen)
+    /// - [`RSEncodeError::RSGenerateParityError`] if parity generation fails.
     pub fn encode(&self, message: &[u8]) -> Result<Buffer, RSEncodeError> {
         let mut buffer = Buffer::with_capacity(message.len() + usize::from(self.parity_bytes()))?;
 
@@ -353,8 +351,6 @@ mod tests {
     enum TestError {
         #[error(transparent)]
         Buffer(#[from] ps_buffer::BufferError),
-        #[error(transparent)]
-        Polynomial(#[from] crate::PolynomialError),
         #[error(transparent)]
         RSConstructor(#[from] RSConstructorError),
         #[error(transparent)]

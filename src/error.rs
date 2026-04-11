@@ -11,16 +11,6 @@ pub enum GFError {
     DivByZero,
 }
 
-#[derive(Error, Debug, Clone, PartialEq, Eq)]
-pub enum PolynomialError {
-    #[error(transparent)]
-    BufferError(#[from] BufferError),
-    #[error(transparent)]
-    GFError(#[from] GFError),
-    #[error("Divisor cannot be zero.")]
-    ZeroDivisor,
-}
-
 #[derive(Error, Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum PolynomialFromSliceError {
     #[error("Slice was {size} bytes, max 255 allowed in GF(256).")]
@@ -74,7 +64,9 @@ pub enum RSGenerateParityError {
     #[error(transparent)]
     BufferError(#[from] BufferError),
     #[error(transparent)]
-    PolynomialError(#[from] PolynomialError),
+    Division(#[from] PolynomialDivError),
+    #[error(transparent)]
+    SetCoefficients(#[from] PolynomialSetCoefficientsError),
 }
 
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
