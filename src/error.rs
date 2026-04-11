@@ -86,8 +86,6 @@ pub enum RSValidationError {
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum RSComputeErrorsError {
     #[error(transparent)]
-    BufferError(#[from] BufferError),
-    #[error(transparent)]
     GFError(#[from] GFError),
     #[error(transparent)]
     EuclideanError(#[from] EuclideanError),

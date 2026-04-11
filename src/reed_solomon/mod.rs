@@ -126,15 +126,14 @@ impl ReedSolomon {
         }
     }
 
-    #[inline]
     /// # Errors
-    /// - [`ps_buffer::BufferError`] is returned if memory allocation fails.
-    /// - [`RSDecodeError::TooManyErrors`] is returned if the input is unrecoverable.
+    /// See [`ReedSolomon::compute_errors_detached`].
+    #[inline]
     pub fn compute_errors(
         &self,
         length: u8,
         syndromes: &[u8],
-    ) -> Result<Option<Buffer>, RSComputeErrorsError> {
+    ) -> Result<Option<Polynomial>, RSComputeErrorsError> {
         Self::compute_errors_detached(self.parity(), length, syndromes)
     }
 
@@ -143,16 +142,15 @@ impl ReedSolomon {
     /// - `length`: full length of codeword, including parity bytes
     /// - `syndromes`: see [`ReedSolomon::validate`]
     /// # Errors
-    /// - [`ps_buffer::BufferError`] is returned if memory allocation fails.
-    /// - `GFError` if an arithmetic operation fails
-    /// - `EuclideanError` if `euclidean` fails (division by zero)
-    /// - `TooManyErrors` if the input is unrecoverable
-    /// - `ZeroDerivative` shouldn't happen
+    /// - [`RSComputeErrorsError::GFError`] if an arithmetic operation fails
+    /// - [`RSComputeErrorsError::EuclideanError`] if the Euclidean algorithm fails
+    /// - [`RSComputeErrorsError::TooManyErrors`] if the input is unrecoverable
+    /// - [`RSComputeErrorsError::ZeroErrorLocatorDerivative`] shouldn't happen
     fn compute_errors_detached(
         parity: u8,
         length: u8,
         syndromes: &[u8],
-    ) -> Result<Option<Buffer>, RSComputeErrorsError> {
+    ) -> Result<Option<Polynomial>, RSComputeErrorsError> {
         if syndromes.iter().all(|&syndrome| syndrome == 0) {
             return Ok(None);
         }
@@ -186,22 +184,18 @@ impl ReedSolomon {
             return Err(RSComputeErrorsError::TooManyErrors);
         }
 
-        let error_positions = error_positions
-            .iter()
-            .copied()
-            .map(usize::from)
-            .take(num_errors);
+        let error_positions = error_positions.iter().copied().take(num_errors);
 
         // Compute error values using Forney's formula
-        let mut errors = Buffer::alloc(length as usize)?;
+        let mut errors = Polynomial::default();
         for j in error_positions {
-            let x = ANTILOG_TABLE[(255 - j) % 255].get();
+            let x = ANTILOG_TABLE[(255 - usize::from(j)) % 255].get();
             let omega_x = Polynomial::eval_at(&omega, x);
             let sigma_deriv_x = Polynomial::eval_derivative_at(&sigma, x);
             if sigma_deriv_x == 0 {
                 return Err(RSComputeErrorsError::ZeroErrorLocatorDerivative);
             }
-            errors[j] = div(omega_x, sigma_deriv_x)?;
+            errors.set(j, div(omega_x, sigma_deriv_x)?);
         }
 
         Ok(Some(errors))
@@ -222,7 +216,10 @@ impl ReedSolomon {
         // Correct the received codeword
         let mut corrected = Buffer::from_slice(received)?;
 
-        Self::apply_corrections(&mut corrected, &errors);
+        Self::apply_corrections(
+            &mut corrected,
+            errors.first_n_coefficients(received_len.into()),
+        );
 
         match Self::validate(self, &corrected)? {
             None => Ok(corrected.into()),
@@ -242,7 +239,7 @@ impl ReedSolomon {
             return Ok(());
         };
 
-        Self::apply_corrections(received, errors);
+        Self::apply_corrections(received, errors.first_n_coefficients(received_len.into()));
 
         match Self::validate(self, received)? {
             None => Ok(()),
@@ -289,7 +286,7 @@ impl ReedSolomon {
         corrected.extend_from_slice(parity)?;
         corrected.extend_from_slice(data)?;
 
-        Self::apply_corrections(&mut corrected, &errors);
+        Self::apply_corrections(&mut corrected, errors.first_n_coefficients(length.into()));
 
         if let Some(_syndromes) = rs.validate(&corrected)? {
             return Err(RSDecodeError::TooManyErrors);
@@ -331,7 +328,7 @@ impl ReedSolomon {
             return Ok(());
         };
 
-        Self::apply_corrections_detached(parity, data, &errors);
+        Self::apply_corrections_detached(parity, data, errors.first_n_coefficients(length.into()));
 
         match Self::validate_detached(parity, data)? {
             None => Ok(()),
