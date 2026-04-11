@@ -132,7 +132,7 @@ impl ReedSolomon {
     /// - [`RSDecodeError::TooManyErrors`] is returned if the input is unrecoverable.
     pub fn compute_errors(
         &self,
-        length: usize,
+        length: u8,
         syndromes: &[u8],
     ) -> Result<Option<Buffer>, RSComputeErrorsError> {
         Self::compute_errors_detached(self.parity(), length, syndromes)
@@ -150,12 +150,9 @@ impl ReedSolomon {
     /// - `ZeroDerivative` shouldn't happen
     fn compute_errors_detached(
         parity: u8,
-        length: usize,
+        length: u8,
         syndromes: &[u8],
     ) -> Result<Option<Buffer>, RSComputeErrorsError> {
-        // TODO: refactor to accept u8 length parameter
-        let length = u8::try_from(length).expect("BUG: input too long");
-
         if syndromes.iter().all(|&syndrome| syndrome == 0) {
             return Ok(None);
         }
@@ -215,9 +212,10 @@ impl ReedSolomon {
     /// - [`ps_buffer::BufferError`] is returned if memory allocation fails.
     /// - [`RSDecodeError`] is propagated from [`ReedSolomon::compute_errors`].
     pub fn correct<'lt>(&self, received: &'lt [u8]) -> Result<Cow<'lt>, RSDecodeError> {
+        let received_len = u8::try_from(received.len())?;
         let syndromes = Self::compute_syndromes(self.parity_bytes(), received)?;
 
-        let Some(errors) = self.compute_errors(received.len(), &syndromes)? else {
+        let Some(errors) = self.compute_errors(received_len, &syndromes)? else {
             return Ok(Cow::Borrowed(received));
         };
 
@@ -237,9 +235,10 @@ impl ReedSolomon {
     /// - [`RSDecodeError`] is propagated from [`ReedSolomon::compute_errors`].
     /// - [`RSDecodeError::TooManyErrors`] is returned if the data is unrecoverable.
     pub fn correct_in_place(&self, received: &mut [u8]) -> Result<(), RSDecodeError> {
+        let received_len = u8::try_from(received.len())?;
         let syndromes = Self::compute_syndromes(self.parity_bytes(), received)?;
 
-        let Some(errors) = self.compute_errors(received.len(), &syndromes)? else {
+        let Some(errors) = self.compute_errors(received_len, &syndromes)? else {
             return Ok(());
         };
 
@@ -275,7 +274,7 @@ impl ReedSolomon {
     ) -> Result<Codeword<'lt>, RSDecodeError> {
         let parity_bytes = parity.len();
         let num_parity = u8::try_from(parity_bytes >> 1)?;
-        let length = parity_bytes + data.len();
+        let length = u8::try_from(parity_bytes + data.len())?;
         let rs = Self::new(num_parity)?;
 
         let syndromes = Self::compute_syndromes_detached(parity, data)?;
@@ -324,7 +323,7 @@ impl ReedSolomon {
     ) -> Result<(), RSDecodeError> {
         let parity_bytes = parity.len();
         let num_parity = u8::try_from(parity_bytes >> 1)?;
-        let length = parity_bytes + data.len();
+        let length = u8::try_from(parity_bytes + data.len())?;
 
         let syndromes = Self::compute_syndromes_detached(parity, data)?;
 
