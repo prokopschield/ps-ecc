@@ -6,6 +6,7 @@ mod bitxor_assign;
 mod debug;
 mod default;
 mod div;
+mod from_iterator;
 mod hash;
 mod index;
 mod into_iterator;
