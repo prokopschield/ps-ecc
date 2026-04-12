@@ -5,7 +5,7 @@ use std::ops::Rem;
 
 pub use constants::*;
 use generator::generator_poly;
-use ps_buffer::{Buffer, BufferError, ToBuffer};
+use ps_buffer::{Buffer, ToBuffer};
 
 use crate::cow::Cow;
 use crate::error::{RSConstructorError, RSDecodeError, RSEncodeError, RSGenerateParityError};
@@ -74,16 +74,13 @@ impl ReedSolomon {
     }
 
     /// Computes the syndromes of a given codeword.
-    /// # Errors
-    /// - [`BufferError`] if allocation fails
-    pub fn compute_syndromes(num_parity_bytes: u8, received: &[u8]) -> Result<Buffer, BufferError> {
+    #[must_use]
+    pub fn compute_syndromes(num_parity_bytes: u8, received: &[u8]) -> Polynomial {
         let num_parity_bytes = num_parity_bytes.into();
 
-        let poly: Polynomial = (0..num_parity_bytes)
+        (0..num_parity_bytes)
             .map(|i| Polynomial::eval_coefficients_at(received, ANTILOG_TABLE[i + 1].get()))
-            .collect();
-
-        poly.first_n_coefficients(num_parity_bytes).to_buffer()
+            .collect()
     }
 
     /// Computes the syndromes of a given detached codeword.
@@ -100,12 +97,12 @@ impl ReedSolomon {
     /// # Errors
     /// `Err(syndromes)` is returned if the codeword is invalid.
     pub fn validate(&self, received: &[u8]) -> Result<Option<Buffer>, RSValidationError> {
-        let syndromes = Self::compute_syndromes(self.parity_bytes(), received)?;
+        let syndromes = Self::compute_syndromes(self.parity_bytes(), received);
 
         if syndromes.iter().all(|&s| s == 0) {
             Ok(None)
         } else {
-            Ok(Some(syndromes))
+            Ok(Some(syndromes.to_buffer()?))
         }
     }
 
@@ -207,9 +204,9 @@ impl ReedSolomon {
     /// - [`RSDecodeError`] is propagated from [`ReedSolomon::compute_errors`].
     pub fn correct<'lt>(&self, received: &'lt [u8]) -> Result<Cow<'lt>, RSDecodeError> {
         let received_len = u8::try_from(received.len())?;
-        let syndromes = Self::compute_syndromes(self.parity_bytes(), received)?;
+        let syndromes = Self::compute_syndromes(self.parity_bytes(), received);
 
-        let Some(errors) = self.compute_errors(received_len, &syndromes)? else {
+        let Some(errors) = self.compute_errors(received_len, syndromes.coefficients())? else {
             return Ok(Cow::Borrowed(received));
         };
 
@@ -233,9 +230,9 @@ impl ReedSolomon {
     /// - [`RSDecodeError::TooManyErrors`] is returned if the data is unrecoverable.
     pub fn correct_in_place(&self, received: &mut [u8]) -> Result<(), RSDecodeError> {
         let received_len = u8::try_from(received.len())?;
-        let syndromes = Self::compute_syndromes(self.parity_bytes(), received)?;
+        let syndromes = Self::compute_syndromes(self.parity_bytes(), received);
 
-        let Some(errors) = self.compute_errors(received_len, &syndromes)? else {
+        let Some(errors) = self.compute_errors(received_len, syndromes.coefficients())? else {
             return Ok(());
         };
 
@@ -557,7 +554,7 @@ mod tests {
         let rs = ReedSolomon::new(2)?;
         let message = b"Syndrome".to_buffer()?;
         let encoded = rs.encode(&message)?;
-        let syndromes = ReedSolomon::compute_syndromes(rs.parity_bytes(), &encoded)?;
+        let syndromes = ReedSolomon::compute_syndromes(rs.parity_bytes(), &encoded);
         assert!(syndromes.iter().all(|&s| s == 0));
         Ok(())
     }
@@ -569,7 +566,7 @@ mod tests {
         let encoded = rs.encode(&message)?;
         let mut corrupted = encoded.clone()?;
         corrupted[0] ^= 1;
-        let syndromes = ReedSolomon::compute_syndromes(rs.parity_bytes(), &corrupted)?;
+        let syndromes = ReedSolomon::compute_syndromes(rs.parity_bytes(), &corrupted);
         assert!(syndromes.iter().any(|&s| s != 0));
         Ok(())
     }
@@ -932,10 +929,131 @@ mod tests {
     }
 
     #[test]
-    fn test_compute_syndromes_empty_codeword() -> Result<(), TestError> {
-        let syndromes = ReedSolomon::compute_syndromes(4u8, &[])?;
-        assert_eq!(syndromes.len(), 4);
+    fn test_compute_syndromes_empty_codeword() {
+        let syndromes = ReedSolomon::compute_syndromes(4u8, &[]);
+
+        assert_eq!(syndromes.degree(), 0);
         assert!(syndromes.iter().all(|&s| s == 0));
+    }
+
+    /// Tests that `correct_in_place` handles syndromes with trailing zeros.
+    ///
+    /// Although `coefficients()` trims trailing zeros, this is harmless because
+    /// the euclidean algorithm converts syndromes to a `Polynomial`, which normalizes
+    /// by trimming trailing zeros anyway.
+    #[test]
+    fn test_correct_in_place_with_trailing_zero_syndrome() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(2)?;
+        let message = b"TestMessage!".to_buffer()?;
+        let encoded = rs.encode(&message)?;
+
+        // Find a double corruption where the last syndrome is zero but others are not.
+        // A single error e at position j gives syndrome S_i = e * α^(i*j), which is
+        // never zero for e ≠ 0. But two errors can cancel: e1*α^(i*j1) + e2*α^(i*j2) = 0.
+        'search: for pos1 in 0..encoded.len() {
+            for pos2 in (pos1 + 1)..encoded.len() {
+                for xor1 in 1u8..=255 {
+                    for xor2 in 1u8..=255 {
+                        let mut corrupted = encoded.clone()?;
+                        corrupted[pos1] ^= xor1;
+                        corrupted[pos2] ^= xor2;
+
+                        let syndromes =
+                            ReedSolomon::compute_syndromes(rs.parity_bytes(), &corrupted);
+                        let coeffs = syndromes.first_n_coefficients(rs.parity_bytes().into());
+
+                        // We want: last syndrome is 0, but not all are 0
+                        if coeffs.last() == Some(&0) && coeffs.iter().any(|&s| s != 0) {
+                            // Found a case where trailing syndrome is zero.
+                            // This should still be correctable (two errors, t=2).
+                            let mut to_correct = corrupted.clone()?;
+                            rs.correct_in_place(&mut to_correct)?;
+                            assert_eq!(to_correct.as_slice(), encoded.as_slice());
+                            break 'search;
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Tests correction when syndrome polynomial has trailing zeros trimmed.
+    ///
+    /// Verifies that `coefficients()` being shorter than `parity_bytes` does not
+    /// affect correctness, since the euclidean algorithm normalizes internally.
+    #[test]
+    fn test_correct_in_place_trailing_zero_syndrome_trimmed() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(2)?;
+        let message = b"TestMessage!".to_buffer()?;
+        let encoded = rs.encode(&message)?;
+
+        // Search for a corruption pattern with trailing zero syndrome
+        for pos1 in 0..encoded.len() {
+            for pos2 in (pos1 + 1)..encoded.len() {
+                for xor1 in 1u8..=255 {
+                    for xor2 in 1u8..=255 {
+                        let mut corrupted = encoded.clone()?;
+                        corrupted[pos1] ^= xor1;
+                        corrupted[pos2] ^= xor2;
+
+                        let syndromes =
+                            ReedSolomon::compute_syndromes(rs.parity_bytes(), &corrupted);
+                        let full = syndromes.first_n_coefficients(rs.parity_bytes().into());
+
+                        if full.last() == Some(&0) && full.iter().any(|&s| s != 0) {
+                            // Found pattern with trailing zero syndrome.
+                            // coefficients() is shorter than parity_bytes due to trimming.
+                            assert!(syndromes.coefficients().len() < rs.parity_bytes().into());
+
+                            // Correction succeeds despite trimmed syndromes.
+                            let mut to_correct = corrupted.clone()?;
+                            rs.correct_in_place(&mut to_correct)?;
+                            assert_eq!(to_correct.as_slice(), encoded.as_slice());
+
+                            return Ok(());
+                        }
+                    }
+                }
+            }
+        }
+
+        panic!("No trailing zero syndrome pattern found");
+    }
+
+    /// Tests that single-error syndromes have no trailing zeros.
+    ///
+    /// A single error at position j produces syndrome S_i = e * α^(i*j), which is
+    /// non-zero for all i when e ≠ 0. Thus `coefficients()` equals `first_n_coefficients()`.
+    #[test]
+    fn test_single_error_syndrome_length() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(3)?;
+        let message = b"Hello".to_buffer()?;
+        let encoded = rs.encode(&message)?;
+        let parity_bytes: usize = rs.parity_bytes().into();
+
+        // Single error - should always be correctable with t=3
+        let mut corrupted = encoded.clone()?;
+        corrupted[0] ^= 1;
+
+        let syndromes = ReedSolomon::compute_syndromes(rs.parity_bytes(), &corrupted);
+
+        // The full syndrome vector should have exactly parity_bytes elements
+        let full = syndromes.first_n_coefficients(parity_bytes);
+        assert_eq!(full.len(), parity_bytes);
+
+        // For a single error, coefficients() has no trailing zeros to trim,
+        // so it equals first_n_coefficients() in length.
+        let trimmed = syndromes.coefficients();
+        assert_eq!(
+            trimmed.len(),
+            parity_bytes,
+            "coefficients() returned {} elements, expected {}",
+            trimmed.len(),
+            parity_bytes
+        );
+
         Ok(())
     }
 

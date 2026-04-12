@@ -270,12 +270,11 @@ mod tests {
         encoded[0] ^= 0x42; // Flip some bits in first byte
 
         // Compute syndromes
-        let syndromes =
-            ReedSolomon::compute_syndromes(rs.parity_bytes(), &encoded).expect("syndromes");
+        let syndromes = ReedSolomon::compute_syndromes(rs.parity_bytes(), &encoded);
 
         // Run euclidean algorithm
         let t = rs.parity_bytes() / 2;
-        let (sigma, omega) = euclidean(&syndromes, t).expect("euclidean succeeds");
+        let (sigma, omega) = euclidean(syndromes.coefficients(), t).expect("euclidean succeeds");
 
         // Verify sigma has at most t roots
         assert!(sigma.degree() <= t, "sigma degree should be <= t");
