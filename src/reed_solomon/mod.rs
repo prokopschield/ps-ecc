@@ -80,9 +80,13 @@ impl ReedSolomon {
         num_parity_bytes: impl Into<usize>,
         received: &[u8],
     ) -> Result<Buffer, BufferError> {
-        (0..num_parity_bytes.into())
+        let num_parity_bytes = num_parity_bytes.into();
+
+        let poly: Polynomial = (0..num_parity_bytes)
             .map(|i| Polynomial::eval_coefficients_at(received, ANTILOG_TABLE[i + 1].get()))
-            .into_buffer()
+            .collect();
+
+        poly.first_n_coefficients(num_parity_bytes).to_buffer()
     }
 
     /// Computes the syndromes of a given detached codeword.
