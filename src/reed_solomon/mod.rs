@@ -76,10 +76,7 @@ impl ReedSolomon {
     /// Computes the syndromes of a given codeword.
     /// # Errors
     /// - [`BufferError`] if allocation fails
-    pub fn compute_syndromes(
-        num_parity_bytes: impl Into<usize>,
-        received: &[u8],
-    ) -> Result<Buffer, BufferError> {
+    pub fn compute_syndromes(num_parity_bytes: u8, received: &[u8]) -> Result<Buffer, BufferError> {
         let num_parity_bytes = num_parity_bytes.into();
 
         let poly: Polynomial = (0..num_parity_bytes)
