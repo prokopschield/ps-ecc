@@ -5,7 +5,7 @@ use std::ops::Rem;
 
 pub use constants::*;
 use generator::generator_poly;
-use ps_buffer::{Buffer, BufferError, ByteIteratorIntoBuffer, ToBuffer};
+use ps_buffer::{Buffer, BufferError, ToBuffer};
 
 use crate::cow::Cow;
 use crate::error::{RSConstructorError, RSDecodeError, RSEncodeError, RSGenerateParityError};
@@ -87,14 +87,13 @@ impl ReedSolomon {
     }
 
     /// Computes the syndromes of a given detached codeword.
-    /// # Errors
-    /// - [`BufferError`] if allocation fails
-    pub fn compute_syndromes_detached(parity: &[u8], data: &[u8]) -> Result<Buffer, BufferError> {
+    #[must_use]
+    pub fn compute_syndromes_detached(parity: &[u8], data: &[u8]) -> Polynomial {
         (0..parity.len())
             .map(|i| {
                 Polynomial::eval_coefficient_slices_at(&[parity, data], ANTILOG_TABLE[i + 1].get())
             })
-            .into_buffer()
+            .collect()
     }
 
     /// Validates a received codeword.
@@ -118,12 +117,12 @@ impl ReedSolomon {
         parity: &[u8],
         data: &[u8],
     ) -> Result<Option<Buffer>, RSValidationError> {
-        let syndromes = Self::compute_syndromes_detached(parity, data)?;
+        let syndromes = Self::compute_syndromes_detached(parity, data);
 
         if syndromes.iter().all(|&s| s == 0) {
             Ok(None)
         } else {
-            Ok(Some(syndromes))
+            Ok(Some(syndromes.to_buffer()?))
         }
     }
 
@@ -275,9 +274,14 @@ impl ReedSolomon {
         let length = u8::try_from(parity_bytes + data.len())?;
         let rs = Self::new(num_parity)?;
 
-        let syndromes = Self::compute_syndromes_detached(parity, data)?;
+        let syndromes = Self::compute_syndromes_detached(parity, data);
 
-        let Some(errors) = Self::compute_errors_detached(num_parity, length, &syndromes)? else {
+        let Some(errors) = Self::compute_errors_detached(
+            num_parity,
+            length,
+            syndromes.first_n_coefficients(parity_bytes),
+        )?
+        else {
             return Ok(data.into());
         };
 
@@ -323,9 +327,14 @@ impl ReedSolomon {
         let num_parity = u8::try_from(parity_bytes >> 1)?;
         let length = u8::try_from(parity_bytes + data.len())?;
 
-        let syndromes = Self::compute_syndromes_detached(parity, data)?;
+        let syndromes = Self::compute_syndromes_detached(parity, data);
 
-        let Some(errors) = Self::compute_errors_detached(num_parity, length, &syndromes)? else {
+        let Some(errors) = Self::compute_errors_detached(
+            num_parity,
+            length,
+            syndromes.first_n_coefficients(parity_bytes),
+        )?
+        else {
             return Ok(());
         };
 
@@ -570,7 +579,7 @@ mod tests {
         let rs = ReedSolomon::new(3)?;
         let message = b"Detached".to_buffer()?;
         let parity = rs.generate_parity(&message)?;
-        let syndromes = ReedSolomon::compute_syndromes_detached(&parity, &message)?;
+        let syndromes = ReedSolomon::compute_syndromes_detached(&parity, &message);
         assert!(syndromes.iter().all(|&s| s == 0));
         Ok(())
     }
@@ -582,7 +591,7 @@ mod tests {
         let parity = rs.generate_parity(&message)?;
         let mut corrupted = message.clone()?;
         corrupted[2] ^= 2;
-        let syndromes = ReedSolomon::compute_syndromes_detached(&parity, &corrupted)?;
+        let syndromes = ReedSolomon::compute_syndromes_detached(&parity, &corrupted);
         assert!(syndromes.iter().any(|&s| s != 0));
         Ok(())
     }
@@ -934,8 +943,8 @@ mod tests {
     fn test_compute_syndromes_detached_empty_data() -> Result<(), TestError> {
         let rs = ReedSolomon::new(2)?;
         let parity = rs.generate_parity(&[])?;
-        let syndromes = ReedSolomon::compute_syndromes_detached(&parity, &[])?;
-        assert_eq!(syndromes.len(), 4);
+        let syndromes = ReedSolomon::compute_syndromes_detached(&parity, &[]);
+        assert_eq!(syndromes.degree(), 0);
         assert!(syndromes.iter().all(|&s| s == 0));
         Ok(())
     }
