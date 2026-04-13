@@ -1,12 +1,14 @@
 mod constants;
 mod generator;
 mod methods;
+mod types;
 
 use std::ops::Rem;
 
 pub use constants::*;
 use generator::generator_poly;
 use ps_buffer::{Buffer, ToBuffer};
+pub use types::*;
 
 use crate::cow::Cow;
 use crate::error::{RSConstructorError, RSDecodeError, RSEncodeError, RSGenerateParityError};
