@@ -74,12 +74,6 @@ pub enum RSEncodeError {
 }
 
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
-pub enum RSValidationError {
-    #[error(transparent)]
-    BufferError(#[from] BufferError),
-}
-
-#[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum RSComputeErrorsError {
     #[error(transparent)]
     GFError(#[from] GFError),
@@ -99,8 +93,6 @@ pub enum RSDecodeError {
     RSComputeErrorsError(#[from] RSComputeErrorsError),
     #[error(transparent)]
     RSConstructorError(#[from] RSConstructorError),
-    #[error(transparent)]
-    RSValidationError(#[from] RSValidationError),
     #[error("Too many errors to correct. Error computation nevertheless returned a valid polynomial, which is unlikely. Usually you'll get RSComputeErrorsError(TooManyErrors) instead.")]
     TooManyErrors,
     #[error(transparent)]

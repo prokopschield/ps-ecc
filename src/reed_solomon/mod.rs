@@ -10,7 +10,7 @@ use ps_buffer::{Buffer, ToBuffer};
 use crate::cow::Cow;
 use crate::error::{RSConstructorError, RSDecodeError, RSEncodeError, RSGenerateParityError};
 use crate::finite_field::{div, inv, ANTILOG_TABLE};
-use crate::{euclidean, Codeword, Polynomial, RSComputeErrorsError, RSValidationError};
+use crate::{euclidean, Codeword, Polynomial, RSComputeErrorsError};
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ReedSolomon {
@@ -94,32 +94,30 @@ impl ReedSolomon {
     }
 
     /// Validates a received codeword.
-    /// # Errors
-    /// `Err(syndromes)` is returned if the codeword is invalid.
-    pub fn validate(&self, received: &[u8]) -> Result<Option<Buffer>, RSValidationError> {
+    ///
+    /// Returns `None` if valid, or `Some(syndromes)` if errors are detected.
+    #[must_use]
+    pub fn validate(&self, received: &[u8]) -> Option<Polynomial> {
         let syndromes = Self::compute_syndromes(self.parity_bytes(), received);
 
         if syndromes.iter().all(|&s| s == 0) {
-            Ok(None)
+            None
         } else {
-            Ok(Some(syndromes.to_buffer()?))
+            Some(syndromes)
         }
     }
 
-    /// Validates a regregated (parity, message) pair.
-    /// # Errors
-    /// `Err(syndromes)` is returned if the codeword is invalid.
-    #[allow(clippy::cast_possible_truncation)]
-    pub fn validate_detached(
-        parity: &[u8],
-        data: &[u8],
-    ) -> Result<Option<Buffer>, RSValidationError> {
+    /// Validates a segregated (parity, data) pair.
+    ///
+    /// Returns `None` if valid, or `Some(syndromes)` if errors are detected.
+    #[must_use]
+    pub fn validate_detached(parity: &[u8], data: &[u8]) -> Option<Polynomial> {
         let syndromes = Self::compute_syndromes_detached(parity, data);
 
         if syndromes.iter().all(|&s| s == 0) {
-            Ok(None)
+            None
         } else {
-            Ok(Some(syndromes.to_buffer()?))
+            Some(syndromes)
         }
     }
 
@@ -218,7 +216,7 @@ impl ReedSolomon {
             errors.first_n_coefficients(received_len.into()),
         );
 
-        match Self::validate(self, &corrected)? {
+        match self.validate(&corrected) {
             None => Ok(corrected.into()),
             Some(_) => Err(RSDecodeError::TooManyErrors),
         }
@@ -238,7 +236,7 @@ impl ReedSolomon {
 
         Self::apply_corrections(received, errors.first_n_coefficients(received_len.into()));
 
-        match Self::validate(self, received)? {
+        match self.validate(received) {
             None => Ok(()),
             Some(_) => Err(RSDecodeError::TooManyErrors),
         }
@@ -285,7 +283,7 @@ impl ReedSolomon {
 
         Self::apply_corrections(&mut corrected, errors.first_n_coefficients(length.into()));
 
-        if let Some(_syndromes) = rs.validate(&corrected)? {
+        if rs.validate(&corrected).is_some() {
             return Err(RSDecodeError::TooManyErrors);
         }
 
@@ -327,7 +325,7 @@ impl ReedSolomon {
 
         Self::apply_corrections_detached(parity, data, errors.first_n_coefficients(length.into()));
 
-        match Self::validate_detached(parity, data)? {
+        match Self::validate_detached(parity, data) {
             None => Ok(()),
             Some(_) => Err(RSDecodeError::TooManyErrors),
         }
@@ -369,8 +367,6 @@ mod tests {
         RSDecode(#[from] RSDecodeError),
         #[error(transparent)]
         RSGenerateParity(#[from] RSGenerateParityError),
-        #[error(transparent)]
-        RSValidation(#[from] RSValidationError),
     }
 
     #[test]
@@ -417,13 +413,13 @@ mod tests {
         let message = b"Hello, World!".to_buffer()?;
         let encoded = rs.encode(&message)?;
 
-        assert!(rs.validate(&encoded)?.is_none());
+        assert!(rs.validate(&encoded).is_none());
 
         let mut corrupted = Buffer::with_capacity(encoded.len())?;
         corrupted.extend_from_slice(&encoded)?;
         corrupted[2] ^= 1;
 
-        assert!(rs.validate(&corrupted)?.is_some());
+        assert!(rs.validate(&corrupted).is_some());
 
         Ok(())
     }
@@ -434,13 +430,13 @@ mod tests {
         let message = b"Hello, World!".to_buffer()?;
         let parity = rs.generate_parity(&message)?;
 
-        assert!(ReedSolomon::validate_detached(&parity, &message)?.is_none());
+        assert!(ReedSolomon::validate_detached(&parity, &message).is_none());
 
         let mut corrupted = Buffer::with_capacity(message.len())?;
         corrupted.extend_from_slice(&message)?;
         corrupted[2] ^= 1;
 
-        assert!(ReedSolomon::validate_detached(&parity, &corrupted)?.is_some());
+        assert!(ReedSolomon::validate_detached(&parity, &corrupted).is_some());
 
         Ok(())
     }
@@ -588,7 +584,7 @@ mod tests {
         let rs = ReedSolomon::new(1)?;
         let message = b"Valid".to_buffer()?;
         let encoded = rs.encode(&message)?;
-        assert!(rs.validate(&encoded)?.is_none());
+        assert!(rs.validate(&encoded).is_none());
         Ok(())
     }
 
@@ -599,7 +595,7 @@ mod tests {
         let encoded = rs.encode(&message)?;
         let mut corrupted = encoded.clone()?;
         corrupted[0] ^= 4;
-        assert!(rs.validate(&corrupted)?.is_some());
+        assert!(rs.validate(&corrupted).is_some());
         Ok(())
     }
 
@@ -608,7 +604,7 @@ mod tests {
         let rs = ReedSolomon::new(2)?;
         let message = b"Detached2".to_buffer()?;
         let parity = rs.generate_parity(&message)?;
-        assert!(ReedSolomon::validate_detached(&parity, &message)?.is_none());
+        assert!(ReedSolomon::validate_detached(&parity, &message).is_none());
         Ok(())
     }
 
@@ -619,7 +615,7 @@ mod tests {
         let parity = rs.generate_parity(&message)?;
         let mut corrupted = message.clone()?;
         corrupted[1] ^= 8;
-        assert!(ReedSolomon::validate_detached(&parity, &corrupted)?.is_some());
+        assert!(ReedSolomon::validate_detached(&parity, &corrupted).is_some());
         Ok(())
     }
 
@@ -875,7 +871,7 @@ mod tests {
         let message = b"".to_buffer()?;
         let encoded = rs.encode(&message)?;
         assert_eq!(encoded.len(), 4); // 2 parity * 2 bytes
-        assert!(rs.validate(&encoded)?.is_none());
+        assert!(rs.validate(&encoded).is_none());
         Ok(())
     }
 
@@ -1109,10 +1105,10 @@ mod tests {
         let rs = ReedSolomon::new(16)?;
         let message = b"LargeParity".to_buffer()?;
         let encoded = rs.encode(&message)?;
-        assert!(rs.validate(&encoded)?.is_none());
+        assert!(rs.validate(&encoded).is_none());
         let mut corrupted = encoded.clone()?;
         corrupted[10] ^= 1;
-        assert!(rs.validate(&corrupted)?.is_some());
+        assert!(rs.validate(&corrupted).is_some());
         Ok(())
     }
 

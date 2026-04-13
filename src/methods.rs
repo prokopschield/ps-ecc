@@ -50,10 +50,7 @@ pub fn validate(received: &[u8], parity: u8) -> bool {
             return false;
         };
 
-        match rs.validate(received) {
-            Ok(None) => true,
-            Ok(Some(_)) | Err(_) => false,
-        }
+        rs.validate(received).is_none()
     } else {
         long::fast_validate(received).unwrap_or_default()
     }
