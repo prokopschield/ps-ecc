@@ -45,12 +45,8 @@ pub enum PolynomialXorError {
 
 #[derive(Error, Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum EuclideanError {
-    #[error("Syndrome slice too long: {0} > 255")]
-    SyndromesTooLong(usize),
     #[error(transparent)]
     PolynomialDiv(#[from] PolynomialDivError),
-    #[error(transparent)]
-    PolynomialFromSlice(#[from] PolynomialFromSliceError),
 }
 
 #[derive(Error, Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]

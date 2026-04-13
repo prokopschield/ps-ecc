@@ -129,7 +129,7 @@ impl ReedSolomon {
     pub fn compute_errors(
         &self,
         length: u8,
-        syndromes: &[u8],
+        syndromes: &Polynomial,
     ) -> Result<Option<Polynomial>, RSComputeErrorsError> {
         Self::compute_errors_detached(self.parity(), length, syndromes)
     }
@@ -137,7 +137,7 @@ impl ReedSolomon {
     /// Computes errors in a received codeword.
     /// # Parameters
     /// - `length`: full length of codeword, including parity bytes
-    /// - `syndromes`: see [`ReedSolomon::validate`]
+    /// - `syndromes`: syndrome polynomial
     /// # Errors
     /// - [`RSComputeErrorsError::GFError`] if an arithmetic operation fails
     /// - [`RSComputeErrorsError::EuclideanError`] if the Euclidean algorithm fails
@@ -146,7 +146,7 @@ impl ReedSolomon {
     fn compute_errors_detached(
         parity: u8,
         length: u8,
-        syndromes: &[u8],
+        syndromes: &Polynomial,
     ) -> Result<Option<Polynomial>, RSComputeErrorsError> {
         if syndromes.iter().all(|&syndrome| syndrome == 0) {
             return Ok(None);
@@ -206,7 +206,7 @@ impl ReedSolomon {
         let received_len = u8::try_from(received.len())?;
         let syndromes = Self::compute_syndromes(self.parity_bytes(), received);
 
-        let Some(errors) = self.compute_errors(received_len, syndromes.coefficients())? else {
+        let Some(errors) = self.compute_errors(received_len, &syndromes)? else {
             return Ok(Cow::Borrowed(received));
         };
 
@@ -232,7 +232,7 @@ impl ReedSolomon {
         let received_len = u8::try_from(received.len())?;
         let syndromes = Self::compute_syndromes(self.parity_bytes(), received);
 
-        let Some(errors) = self.compute_errors(received_len, syndromes.coefficients())? else {
+        let Some(errors) = self.compute_errors(received_len, &syndromes)? else {
             return Ok(());
         };
 
@@ -273,12 +273,7 @@ impl ReedSolomon {
 
         let syndromes = Self::compute_syndromes_detached(parity, data);
 
-        let Some(errors) = Self::compute_errors_detached(
-            num_parity,
-            length,
-            syndromes.first_n_coefficients(parity_bytes),
-        )?
-        else {
+        let Some(errors) = Self::compute_errors_detached(num_parity, length, &syndromes)? else {
             return Ok(data.into());
         };
 
@@ -326,12 +321,7 @@ impl ReedSolomon {
 
         let syndromes = Self::compute_syndromes_detached(parity, data);
 
-        let Some(errors) = Self::compute_errors_detached(
-            num_parity,
-            length,
-            syndromes.first_n_coefficients(parity_bytes),
-        )?
-        else {
+        let Some(errors) = Self::compute_errors_detached(num_parity, length, &syndromes)? else {
             return Ok(());
         };
 
@@ -1024,7 +1014,7 @@ mod tests {
 
     /// Tests that single-error syndromes have no trailing zeros.
     ///
-    /// A single error at position j produces syndrome S_i = e * α^(i*j), which is
+    /// A single error at position j produces syndrome `S_i` = e * α^(i*j), which is
     /// non-zero for all i when e ≠ 0. Thus `coefficients()` equals `first_n_coefficients()`.
     #[test]
     fn test_single_error_syndrome_length() -> Result<(), TestError> {

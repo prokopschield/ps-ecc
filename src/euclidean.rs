@@ -7,12 +7,12 @@ use crate::{EuclideanError, Polynomial};
 
 /// Extended Euclidean algorithm for Reed-Solomon decoding.
 ///
-/// Given syndrome coefficients and parity count `t`, computes the error
+/// Given syndrome polynomial and parity count `t`, computes the error
 /// locator polynomial (sigma) and error evaluator polynomial (omega).
 ///
 /// # Arguments
 ///
-/// * `syndromes` - Syndrome coefficients in ascending degree order
+/// * `syndromes` - Syndrome polynomial
 /// * `t` - Number of parity symbols (must satisfy `2*t <= 255`)
 ///
 /// # Returns
@@ -23,14 +23,11 @@ use crate::{EuclideanError, Polynomial};
 ///
 /// # Errors
 ///
-/// Returns an error if:
-/// * `syndromes` exceeds 255 bytes
-/// * Division by zero occurs (indicates invalid input)
-pub fn euclidean(syndromes: &[u8], t: u8) -> Result<(Polynomial, Polynomial), EuclideanError> {
-    if syndromes.len() > 255 {
-        return Err(EuclideanError::SyndromesTooLong(syndromes.len()));
-    }
-
+/// Returns an error if division by zero occurs (indicates invalid input).
+pub fn euclidean(
+    syndromes: &Polynomial,
+    t: u8,
+) -> Result<(Polynomial, Polynomial), EuclideanError> {
     // Ring buffers: r[idx] is current, r[idx ^ 1] is previous
     let mut r: [Polynomial; 2] = [Polynomial::default(), Polynomial::default()];
     let mut t_poly: [Polynomial; 2] = [Polynomial::default(), Polynomial::default()];
@@ -42,7 +39,7 @@ pub fn euclidean(syndromes: &[u8], t: u8) -> Result<(Polynomial, Polynomial), Eu
     r[0].set(two_t as u8, 1);
 
     // r[1] = syndrome polynomial
-    r[1] = Polynomial::try_from(syndromes)?;
+    r[1] = *syndromes;
 
     // t[0] = 0 (already default)
     // t[1] = 1
@@ -94,7 +91,7 @@ mod tests {
     #[test]
     fn euclidean_zero_syndromes() {
         // All-zero syndromes indicate no errors
-        let syndromes = [0u8; 4];
+        let syndromes: Polynomial = [0u8; 4].into_iter().collect();
         let t = 2;
 
         let (sigma, omega) = euclidean(&syndromes, t).expect("should succeed");
@@ -110,7 +107,7 @@ mod tests {
         // For a single error at position j, sigma(x) = 1 - alpha^j * x
         // The syndrome for a single error e at position j is: S_i = e * alpha^(i*j)
         // Let's use error value e=1 at position j=0, so S_i = alpha^0 = 1 for all i
-        let syndromes = [1u8; 4]; // Single error at position 0 with value 1
+        let syndromes: Polynomial = [1u8; 4].into_iter().collect(); // Single error at position 0 with value 1
         let t = 2;
 
         let (sigma, _omega) = euclidean(&syndromes, t).expect("should succeed");
@@ -143,7 +140,7 @@ mod tests {
         // The extended Euclidean algorithm guarantees:
         // - deg(sigma) <= t (error locator has at most t roots)
         // - deg(omega) < t (loop exits when remainder degree < t)
-        let syndromes = [3u8, 5, 7, 11]; // Arbitrary non-zero syndromes
+        let syndromes: Polynomial = [3u8, 5, 7, 11].into_iter().collect(); // Arbitrary non-zero syndromes
         let t = 2;
 
         let (sigma, omega) = euclidean(&syndromes, t).expect("should succeed");
@@ -168,7 +165,7 @@ mod tests {
     #[test]
     fn euclidean_with_t_equals_one() {
         // Minimum parity: can correct 1 error
-        let syndromes = [42u8, 0]; // 2t = 2 syndromes
+        let syndromes: Polynomial = [42u8, 0].into_iter().collect(); // 2t = 2 syndromes
         let t = 1;
 
         let (sigma, omega) = euclidean(&syndromes, t).expect("should succeed");
@@ -180,7 +177,7 @@ mod tests {
     #[test]
     fn euclidean_with_large_t() {
         // Larger parity count
-        let syndromes = [1u8; 20]; // t = 10
+        let syndromes: Polynomial = [1u8; 20].into_iter().collect(); // t = 10
         let t = 10;
 
         let (sigma, omega) = euclidean(&syndromes, t).expect("should succeed");
@@ -192,7 +189,7 @@ mod tests {
     #[test]
     fn euclidean_minimal_valid_case() {
         // Minimal meaningful case: t=1, 2 syndromes
-        let syndromes = [42u8, 17];
+        let syndromes: Polynomial = [42u8, 17].into_iter().collect();
         let t = 1;
 
         let (sigma, omega) = euclidean(&syndromes, t).expect("should succeed");
@@ -204,7 +201,7 @@ mod tests {
     #[test]
     fn euclidean_syndrome_with_trailing_zeros() {
         // Syndromes with trailing zeros (leading zeros in polynomial sense)
-        let syndromes = [1u8, 2, 0, 0]; // Effective degree 1, but length 4
+        let syndromes: Polynomial = [1u8, 2, 0, 0].into_iter().collect(); // Effective degree 1, but length 4
         let t = 2;
 
         let (sigma, omega) = euclidean(&syndromes, t).expect("should succeed");
@@ -222,18 +219,9 @@ mod tests {
     }
 
     #[test]
-    fn euclidean_too_long() {
-        let syndromes = [0u8; 256];
-
-        let result = euclidean(&syndromes, 1);
-
-        assert!(matches!(result, Err(EuclideanError::SyndromesTooLong(256))));
-    }
-
-    #[test]
     fn euclidean_max_valid_length() {
-        // 255 bytes is the maximum valid length
-        let syndromes = [0u8; 255];
+        // 255 coefficients is the maximum for Polynomial
+        let syndromes: Polynomial = [0u8; 255].into_iter().collect();
         let t = 127;
 
         let result = euclidean(&syndromes, t);
@@ -244,7 +232,7 @@ mod tests {
     #[test]
     fn euclidean_output_is_deterministic() {
         // Same input should always produce same output
-        let syndromes = [7u8, 13, 19, 23, 29, 31];
+        let syndromes: Polynomial = [7u8, 13, 19, 23, 29, 31].into_iter().collect();
         let t = 3;
 
         let (sigma1, omega1) = euclidean(&syndromes, t).expect("should succeed");
@@ -274,7 +262,7 @@ mod tests {
 
         // Run euclidean algorithm
         let t = rs.parity_bytes() / 2;
-        let (sigma, omega) = euclidean(syndromes.coefficients(), t).expect("euclidean succeeds");
+        let (sigma, omega) = euclidean(&syndromes, t).expect("euclidean succeeds");
 
         // Verify sigma has at most t roots
         assert!(sigma.degree() <= t, "sigma degree should be <= t");
