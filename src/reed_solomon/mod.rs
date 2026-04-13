@@ -1,5 +1,6 @@
 mod constants;
 mod generator;
+mod methods;
 
 use std::ops::Rem;
 
@@ -292,17 +293,6 @@ impl ReedSolomon {
         let codeword = Codeword { codeword, range };
 
         Ok(codeword)
-    }
-
-    /// Corrects a message based on detached parity bytes.
-    /// # Errors
-    /// - [`RSDecodeError`] is returned if `data` is not recoverable.
-    #[inline]
-    pub fn correct_detached_data_in_place(
-        parity: &[u8],
-        data: &mut [u8],
-    ) -> Result<(), RSDecodeError> {
-        Self::correct_detached_in_place(&mut parity.to_buffer()?, data)
     }
 
     /// Corrects a message based on detached parity bytes.
@@ -735,46 +725,6 @@ mod tests {
     }
 
     #[test]
-    fn test_correct_detached_data_in_place_no_errors() -> Result<(), TestError> {
-        let rs = ReedSolomon::new(2)?;
-        let message = b"DataInPlaceOk".to_buffer()?;
-        let parity = rs.generate_parity(&message)?;
-        let mut data = message.clone()?;
-        ReedSolomon::correct_detached_data_in_place(&parity, &mut data)?;
-        assert_eq!(data.as_slice(), message.as_slice());
-        Ok(())
-    }
-
-    #[test]
-    fn test_correct_detached_data_in_place_one_error() -> Result<(), TestError> {
-        let rs = ReedSolomon::new(3)?;
-        let message = b"DataInPlaceErr".to_buffer()?;
-        let parity = rs.generate_parity(&message)?;
-        let mut data = message.clone()?;
-        data[3] ^= 128;
-        ReedSolomon::correct_detached_data_in_place(&parity, &mut data)?;
-        assert_eq!(data.as_slice(), message.as_slice());
-        Ok(())
-    }
-
-    #[test]
-    fn test_correct_detached_data_in_place_too_many_errors() -> Result<(), TestError> {
-        let rs = ReedSolomon::new(1)?;
-        let message = b"DataInPlaceMany".to_buffer()?;
-        let parity = rs.generate_parity(&message)?;
-        let mut data = message.clone()?;
-        data[0] ^= 1;
-        data[2] ^= 2;
-        assert_eq!(
-            ReedSolomon::correct_detached_data_in_place(&parity, &mut data),
-            Err(RSDecodeError::RSComputeErrorsError(
-                RSComputeErrorsError::TooManyErrors
-            ))
-        );
-        Ok(())
-    }
-
-    #[test]
     fn test_apply_corrections() -> Result<(), TestError> {
         let mut target = Buffer::from_slice([1, 2, 3, 4])?;
         let corrections = [0, 3, 0, 5];
@@ -898,19 +848,6 @@ mod tests {
         corrupted[3] ^= 8; // Error in parity
         let decoded = rs.decode(&corrupted)?;
         assert_eq!(&decoded[..], &message[..]);
-        Ok(())
-    }
-
-    #[test]
-    fn test_correct_detached_data_in_place_multiple_errors() -> Result<(), TestError> {
-        let rs = ReedSolomon::new(4)?;
-        let message = b"MultiErr".to_buffer()?;
-        let parity = rs.generate_parity(&message)?;
-        let mut data = message.clone()?;
-        data[0] ^= 1;
-        data[4] ^= 16;
-        ReedSolomon::correct_detached_data_in_place(&parity, &mut data)?;
-        assert_eq!(data.as_slice(), message.as_slice());
         Ok(())
     }
 
