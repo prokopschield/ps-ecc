@@ -100,7 +100,7 @@ impl ReedSolomon {
     pub fn validate(&self, received: &[u8]) -> Option<Polynomial> {
         let syndromes = Self::compute_syndromes(self.parity_bytes(), received);
 
-        if syndromes.iter().all(|&s| s == 0) {
+        if syndromes.is_zero() {
             None
         } else {
             Some(syndromes)
@@ -114,7 +114,7 @@ impl ReedSolomon {
     pub fn validate_detached(parity: &[u8], data: &[u8]) -> Option<Polynomial> {
         let syndromes = Self::compute_syndromes_detached(parity, data);
 
-        if syndromes.iter().all(|&s| s == 0) {
+        if syndromes.is_zero() {
             None
         } else {
             Some(syndromes)
@@ -146,7 +146,7 @@ impl ReedSolomon {
         length: u8,
         syndromes: &Polynomial,
     ) -> Result<Option<Polynomial>, RSComputeErrorsError> {
-        if syndromes.iter().all(|&syndrome| syndrome == 0) {
+        if syndromes.is_zero() {
             return Ok(None);
         }
 
@@ -541,7 +541,7 @@ mod tests {
         let message = b"Syndrome".to_buffer()?;
         let encoded = rs.encode(&message)?;
         let syndromes = ReedSolomon::compute_syndromes(rs.parity_bytes(), &encoded);
-        assert!(syndromes.iter().all(|&s| s == 0));
+        assert!(syndromes.is_zero());
         Ok(())
     }
 
@@ -563,7 +563,7 @@ mod tests {
         let message = b"Detached".to_buffer()?;
         let parity = rs.generate_parity(&message)?;
         let syndromes = ReedSolomon::compute_syndromes_detached(&parity, &message);
-        assert!(syndromes.iter().all(|&s| s == 0));
+        assert!(syndromes.is_zero());
         Ok(())
     }
 
@@ -919,7 +919,7 @@ mod tests {
         let syndromes = ReedSolomon::compute_syndromes(4u8, &[]);
 
         assert_eq!(syndromes.degree(), 0);
-        assert!(syndromes.iter().all(|&s| s == 0));
+        assert!(syndromes.is_zero());
     }
 
     /// Tests that `correct_in_place` handles syndromes with trailing zeros.
@@ -1049,7 +1049,7 @@ mod tests {
         let parity = rs.generate_parity(&[])?;
         let syndromes = ReedSolomon::compute_syndromes_detached(&parity, &[]);
         assert_eq!(syndromes.degree(), 0);
-        assert!(syndromes.iter().all(|&s| s == 0));
+        assert!(syndromes.is_zero());
         Ok(())
     }
 

@@ -10,6 +10,7 @@ mod eval_coefficients_derivative_at;
 mod eval_derivative_at;
 mod first_n_coefficients;
 mod from_slice;
+mod is_zero;
 mod iter;
 mod mul_xor_assign;
 mod set;

@@ -155,7 +155,7 @@ mod tests {
 
         // Verify deg(omega) < t (algorithm invariant)
         assert!(
-            omega.degree() < t || omega.coefficients() == [0],
+            omega.degree() < t || omega.is_zero(),
             "omega degree {} should be < t={}",
             omega.degree(),
             t
@@ -171,7 +171,7 @@ mod tests {
         let (sigma, omega) = euclidean(&syndromes, t).expect("should succeed");
 
         assert!(sigma.degree() <= t);
-        assert!(omega.degree() < t || omega.coefficients() == [0]);
+        assert!(omega.degree() < t || omega.is_zero());
     }
 
     #[test]
@@ -183,7 +183,7 @@ mod tests {
         let (sigma, omega) = euclidean(&syndromes, t).expect("should succeed");
 
         assert!(sigma.degree() <= t);
-        assert!(omega.degree() < t || omega.coefficients() == [0]);
+        assert!(omega.degree() < t || omega.is_zero());
     }
 
     #[test]
@@ -195,7 +195,7 @@ mod tests {
         let (sigma, omega) = euclidean(&syndromes, t).expect("should succeed");
 
         assert!(sigma.degree() <= t);
-        assert!(omega.degree() < t || omega.coefficients() == [0]);
+        assert!(omega.degree() < t || omega.is_zero());
     }
 
     #[test]
@@ -211,7 +211,7 @@ mod tests {
 
         // omega degree bounded by t (loop exits when deg(r) < t)
         assert!(
-            omega.degree() < t || omega.coefficients() == [0],
+            omega.degree() < t || omega.is_zero(),
             "omega degree {} should be < t={}",
             omega.degree(),
             t
@@ -269,7 +269,7 @@ mod tests {
 
         // Verify omega degree constraint (deg(omega) < t)
         assert!(
-            omega.degree() < t || omega.coefficients() == [0],
+            omega.degree() < t || omega.is_zero(),
             "omega degree {} should be < t={}",
             omega.degree(),
             t
