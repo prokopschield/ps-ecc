@@ -25,12 +25,14 @@ const fn compute_generator_data() -> [u8; TOTAL_COEFFS] {
 
     // Temporary workspace for building polynomials incrementally
     let mut poly = [0u8; 2 * MAX_PARITY_USIZE + 1];
+
     poly[0] = 1; // g_0(x) = 1
 
     // Copy g_0 to data
     data[0] = 1;
 
     let mut parity = 1;
+
     while parity <= MAX_PARITY_USIZE {
         // Multiply by (x + α^{2*parity-1}) and (x + α^{2*parity})
         let root1 = ANTILOG_TABLE[2 * parity - 1].get();
@@ -85,6 +87,7 @@ pub(super) fn generator_poly(parity: u8) -> &'static [u8] {
     let p = parity as usize;
     let start = p * p;
     let len = 2 * p + 1;
+
     &GENERATOR_DATA[start..start + len]
 }
 
@@ -102,6 +105,7 @@ mod tests {
     fn generator_poly_parity_one() {
         // g(x) = (x + α^1)(x + α^2) = x² + (α^1 ⊕ α^2)x + α^3
         let g = generator_poly(1);
+
         assert_eq!(g.len(), 3);
 
         let alpha1 = ANTILOG_TABLE[1].get();
@@ -118,6 +122,7 @@ mod tests {
         for p in 0..=MAX_PARITY_USIZE {
             let g = generator_poly(p as u8);
             let degree = 2 * p;
+
             assert_eq!(g[degree], 1, "parity {p} should be monic");
         }
     }
@@ -126,6 +131,7 @@ mod tests {
     fn generator_poly_correct_length() {
         for p in 0..=MAX_PARITY_USIZE {
             let expected = 2 * p + 1;
+
             assert_eq!(generator_poly(p as u8).len(), expected);
         }
     }
@@ -137,6 +143,7 @@ mod tests {
 
             for (i, alpha_i) in ANTILOG_TABLE.iter().take(2 * p + 1).enumerate().skip(1) {
                 let eval = eval_poly(g, alpha_i.get());
+
                 assert_eq!(eval, 0, "parity {p}: g(α^{i}) should be 0");
             }
         }
@@ -144,9 +151,11 @@ mod tests {
 
     fn eval_poly(coeffs: &[u8], x: u8) -> u8 {
         let mut result = 0u8;
+
         for &c in coeffs.iter().rev() {
             result = mul(result, x) ^ c;
         }
+
         result
     }
 }

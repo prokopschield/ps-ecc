@@ -70,6 +70,7 @@ mod tests {
         let parity = rs.generate_parity(&message)?;
 
         let mut data = message.clone()?;
+
         data[0] ^= 0x42;
 
         ReedSolomon::correct_detached_data_in_place(&parity, &mut data)?;
@@ -87,6 +88,7 @@ mod tests {
 
         let mut data = message.clone()?;
         let last = data.len() - 1;
+
         data[last] ^= 0xFF;
 
         ReedSolomon::correct_detached_data_in_place(&parity, &mut data)?;
@@ -104,6 +106,7 @@ mod tests {
 
         let mut data = message.clone()?;
         let mid = data.len() / 2;
+
         data[mid] ^= 0x80;
 
         ReedSolomon::correct_detached_data_in_place(&parity, &mut data)?;
@@ -120,6 +123,7 @@ mod tests {
         let parity = rs.generate_parity(&message)?;
 
         let mut data = message.clone()?;
+
         data[0] ^= 0x11;
         data[5] ^= 0x22;
 
@@ -137,6 +141,7 @@ mod tests {
         let parity = rs.generate_parity(&message)?;
 
         let mut data = message.clone()?;
+
         data[0] ^= 0x11;
         data[1] ^= 0x22;
         data[2] ^= 0x33;
@@ -156,6 +161,7 @@ mod tests {
         let parity = rs.generate_parity(&message)?;
 
         let mut data = message.clone()?;
+
         data[0] ^= 0x01;
         data[3] ^= 0x02;
         data[7] ^= 0x04;
@@ -175,6 +181,7 @@ mod tests {
         let parity = rs.generate_parity(&message)?;
 
         let mut data = message.clone()?;
+
         data[0] ^= 0xFF;
 
         ReedSolomon::correct_detached_data_in_place(&parity, &mut data)?;
@@ -226,7 +233,9 @@ mod tests {
 
         // Corrupt both parity and data
         parity[0] ^= 0x11;
+
         let mut data = message.clone()?;
+
         data[0] ^= 0x22;
         data[5] ^= 0x33;
 
@@ -244,6 +253,7 @@ mod tests {
         let parity = rs.generate_parity(&message)?;
 
         let mut data = message.clone()?;
+
         data[0] ^= 0xFF;
 
         ReedSolomon::correct_detached_data_in_place(&parity, &mut data)?;
@@ -260,6 +270,7 @@ mod tests {
         let parity = rs.generate_parity(&message)?;
 
         let mut data = message.clone()?;
+
         data[0] ^= 0x01;
         data[50] ^= 0x02;
         data[100] ^= 0x04;
@@ -280,6 +291,7 @@ mod tests {
         let parity = rs.generate_parity(&message)?;
 
         let mut data = message.clone()?;
+
         data[0] = 0;
         data[1] = 0;
 
@@ -297,6 +309,7 @@ mod tests {
         let parity = rs.generate_parity(&message)?;
 
         let mut data = message.clone()?;
+
         data[4] ^= 0x77;
 
         ReedSolomon::correct_detached_data_in_place(&parity, &mut data)?;
@@ -331,6 +344,7 @@ mod tests {
         let parity = rs.generate_parity(&message)?;
 
         let mut data = message.clone()?;
+
         data[5] ^= 0x11;
         data[6] ^= 0x22;
         data[7] ^= 0x33;
@@ -351,6 +365,7 @@ mod tests {
 
         // Test with extreme error values
         let mut data = message.clone()?;
+
         data[0] ^= 0x01; // Minimum non-zero
         data[5] ^= 0xFF; // Maximum
 
@@ -368,6 +383,7 @@ mod tests {
         let parity = rs.generate_parity(&message)?;
 
         let mut data = message.clone()?;
+
         data[0] ^= 0x42;
 
         // First correction

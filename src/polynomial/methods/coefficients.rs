@@ -22,38 +22,47 @@ mod tests {
     #[test]
     fn default_polynomial_has_one_coefficient() {
         let p = Polynomial::default();
+
         assert_eq!(p.coefficients(), &[0]);
     }
 
     #[test]
     fn coefficients_match_set_values() {
         let mut p = Polynomial::default();
+
         p.set(0, 5);
         p.set(1, 3);
         p.set(2, 7);
+
         assert_eq!(p.coefficients(), &[5, 3, 7]);
     }
 
     #[test]
     fn sparse_polynomial_includes_zeros() {
         let mut p = Polynomial::default();
+
         p.set(0, 1);
         p.set(3, 2);
+
         assert_eq!(p.coefficients(), &[1, 0, 0, 2]);
     }
 
     #[test]
     fn coefficients_length_is_degree_plus_one() {
         let mut p = Polynomial::default();
+
         p.set(5, 1);
+
         assert_eq!(p.coefficients().len(), 6);
     }
 
     #[test]
     fn coefficients_after_trim() {
         let mut p = Polynomial::default();
+
         p.set(4, 1);
         p.set(4, 0);
+
         assert_eq!(p.coefficients(), &[0]);
     }
 }

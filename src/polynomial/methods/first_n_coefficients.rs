@@ -17,6 +17,7 @@ mod tests {
     #[test]
     fn exact_size() {
         let mut p = Polynomial::default();
+
         p.set(0, 1);
         p.set(1, 2);
         p.set(2, 3);
@@ -27,6 +28,7 @@ mod tests {
     #[test]
     fn zeros_beyond_degree() {
         let mut p = Polynomial::default();
+
         p.set(0, 1);
         p.set(1, 2);
 
@@ -36,6 +38,7 @@ mod tests {
     #[test]
     fn truncates() {
         let mut p = Polynomial::default();
+
         p.set(0, 1);
         p.set(1, 2);
         p.set(2, 3);
@@ -55,6 +58,7 @@ mod tests {
     #[test]
     fn n_is_zero() {
         let mut p = Polynomial::default();
+
         p.set(0, 1);
 
         assert_eq!(p.first_n_coefficients(0), &[]);
@@ -63,6 +67,7 @@ mod tests {
     #[test]
     fn n_is_255() {
         let mut p = Polynomial::default();
+
         p.set(0, 1);
 
         let result = p.first_n_coefficients(255);
@@ -75,6 +80,7 @@ mod tests {
     #[test]
     fn n_exceeds_255_clamps() {
         let mut p = Polynomial::default();
+
         p.set(0, 1);
         p.set(1, 2);
 

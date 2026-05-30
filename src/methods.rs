@@ -69,6 +69,7 @@ mod tests {
 
         for i in 0..13 {
             let index = (i * 37) % encoded.len();
+
             encoded[index] ^= (i * index + 13).to_le_bytes()[0];
             let decoded = decode(&encoded, 13)?;
 
@@ -114,6 +115,7 @@ mod validate_tests {
         let codeword = rs.encode(data)?;
 
         assert!(validate(&codeword, parity));
+
         Ok(())
     }
 
@@ -130,6 +132,7 @@ mod validate_tests {
         codeword[2] ^= 1;
 
         assert!(!validate(&codeword, parity));
+
         Ok(())
     }
 
@@ -197,6 +200,7 @@ mod validate_tests {
 
         // Invalid data should fail validation
         assert!(!validate(&encoded, parity));
+
         Ok(())
     }
 
@@ -232,6 +236,7 @@ mod validate_tests {
         let codeword = rs.encode(data)?;
 
         assert!(validate(&codeword, parity));
+
         Ok(())
     }
 
@@ -243,6 +248,7 @@ mod validate_tests {
         let codeword = rs.encode(data)?;
 
         assert!(validate(&codeword, parity));
+
         Ok(())
     }
 
@@ -255,6 +261,7 @@ mod validate_tests {
         let codeword = rs.encode(data)?;
 
         assert!(validate(&codeword, parity));
+
         Ok(())
     }
 
@@ -278,6 +285,7 @@ mod validate_tests {
 
         // Zero parity should still validate correctly
         assert!(validate(&encoded, parity));
+
         Ok(())
     }
 
@@ -296,6 +304,7 @@ mod validate_tests {
 
         // Corrupted header should fail validation
         assert!(!validate(&encoded, parity));
+
         Ok(())
     }
 
@@ -320,6 +329,7 @@ mod validate_tests {
         codeword[1] ^= 1; // 2 errors with parity=1 - unrecoverable
 
         assert!(!validate(&codeword, parity));
+
         Ok(())
     }
 
@@ -334,12 +344,14 @@ mod validate_tests {
 
         // Corrupt parity bytes
         let parity_start = 32 + message.len();
+
         if parity_start < encoded.len() {
             encoded[parity_start] ^= 1;
         }
 
         // Corrupted parity should fail validation
         assert!(!validate(&encoded, parity));
+
         Ok(())
     }
 }

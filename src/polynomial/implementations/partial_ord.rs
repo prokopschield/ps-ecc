@@ -14,6 +14,7 @@ mod tests {
     fn partial_cmp_returns_some() {
         let a = Polynomial::default();
         let b = Polynomial::default();
+
         assert!(a.partial_cmp(&b).is_some());
     }
 
@@ -21,8 +22,10 @@ mod tests {
     fn partial_cmp_consistent_with_cmp() {
         let mut a = Polynomial::default();
         let mut b = Polynomial::default();
+
         a.set(2, 5);
         b.set(2, 3);
+
         assert_eq!(a.partial_cmp(&b), Some(a.cmp(&b)));
     }
 
@@ -30,8 +33,10 @@ mod tests {
     fn less_than_operator() {
         let mut a = Polynomial::default();
         let mut b = Polynomial::default();
+
         a.set(1, 1);
         b.set(1, 2);
+
         assert!(a < b);
         assert!((b >= a));
     }
@@ -40,8 +45,10 @@ mod tests {
     fn greater_than_operator() {
         let mut a = Polynomial::default();
         let mut b = Polynomial::default();
+
         a.set(2, 1);
         b.set(1, 255);
+
         assert!(a > b);
         assert!((b <= a));
     }
@@ -50,11 +57,15 @@ mod tests {
     fn less_or_equal_operator() {
         let mut a = Polynomial::default();
         let mut b = Polynomial::default();
+
         a.set(1, 5);
         b.set(1, 5);
+
         assert!(a <= b);
         assert!(b <= a);
+
         b.set(1, 6);
+
         assert!(a <= b);
         assert!((b > a));
     }
@@ -63,11 +74,15 @@ mod tests {
     fn greater_or_equal_operator() {
         let mut a = Polynomial::default();
         let mut b = Polynomial::default();
+
         a.set(1, 5);
         b.set(1, 5);
+
         assert!(a >= b);
         assert!(b >= a);
+
         a.set(1, 6);
+
         assert!(a >= b);
         assert!((b < a));
     }

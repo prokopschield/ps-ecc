@@ -26,6 +26,7 @@ mod tests {
     #[test]
     fn constant_nonzero_is_not_zero() {
         let mut p = Polynomial::default();
+
         p.set(0, 1);
 
         assert!(!p.is_zero());
@@ -34,6 +35,7 @@ mod tests {
     #[test]
     fn polynomial_with_higher_degree_is_not_zero() {
         let mut p = Polynomial::default();
+
         p.set(2, 1);
 
         assert!(!p.is_zero());

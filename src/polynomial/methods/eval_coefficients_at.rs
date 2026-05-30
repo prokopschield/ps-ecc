@@ -108,6 +108,7 @@ mod tests {
     #[test]
     fn max_degree_monomial() {
         let mut coefficients = [0u8; Polynomial::MAX_COEFFICIENTS as usize];
+
         coefficients[Polynomial::MAX_DEGREE as usize] = 1;
 
         assert_exhaustive(&coefficients);

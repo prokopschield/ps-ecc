@@ -19,6 +19,7 @@ mod tests {
 
     fn hash_of<T: Hash>(value: &T) -> u64 {
         let mut hasher = DefaultHasher::new();
+
         value.hash(&mut hasher);
         hasher.finish()
     }

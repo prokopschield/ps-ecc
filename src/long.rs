@@ -116,6 +116,7 @@ pub fn fast_validate(codeword: &[u8]) -> Result<bool, LongEccDecodeError> {
 /// Calculate CRC32 checksum
 fn crc32(data: &[u8]) -> u32 {
     let mut hasher = crc32fast::Hasher::new();
+
     hasher.update(data);
     hasher.finalize()
 }
@@ -209,6 +210,7 @@ pub fn encode(
 
         // Generate and append parity for this segment
         let parity_data = rs.generate_parity(&codeword[index..segment_end])?;
+
         codeword.extend_from_slice(&parity_data)?;
 
         // Move to next segment
@@ -276,6 +278,7 @@ pub fn correct_in_place(codeword: &mut [u8]) -> Result<LongEccHeader, LongEccDec
 
     // Correct last chunk (data + parity)
     let (md, mp) = codeword[data_index..].split_at_mut(last_segment_length);
+
     ReedSolomon::correct_detached_in_place(mp, md)?;
 
     // Correct previous segments in reverse order
@@ -375,7 +378,9 @@ mod tests {
             crc32: 0x1234_5678,
             xxh64: 0x1234_5678_90AB_CDEF,
         };
+
         let bytes = header.to_bytes()?;
+
         assert_eq!(&bytes[0..4], &32u32.to_le_bytes());
         assert_eq!(&bytes[4..8], &12u32.to_le_bytes());
         assert_eq!(bytes[8], 6);
@@ -384,37 +389,49 @@ mod tests {
         assert_eq!(bytes[11], 18);
         assert_eq!(&bytes[12..16], &0x1234_5678u32.to_le_bytes());
         assert_eq!(&bytes[16..24], &0x1234_5678_90AB_CDEFu64.to_le_bytes());
+
         Ok(())
     }
 
     #[test]
     fn test_long_ecc_encode_no_parity() -> Result<(), TestError> {
         let message = b"No Parity".to_buffer()?;
+
         let encoded = encode(&message, 0, 10, 5)?;
+
         assert_eq!(encoded.len(), HEADER_SIZE + message.len());
+
         let header = LongEccHeader::from_bytes(&encoded)?;
+
         assert_eq!(header.parity, 0);
         assert_eq!(header.full_length as usize, encoded.len());
         assert_eq!(header.message_length as usize, message.len());
+
         Ok(())
     }
 
     #[test]
     fn test_long_ecc_encode_invalid_parity() -> Result<(), TestError> {
         let message = b"Invalid Parity".to_buffer()?;
+
         let result = encode(&message, 64, 10, 5);
+
         assert!(matches!(result, Err(LongEccEncodeError::InvalidParity(64))));
+
         Ok(())
     }
 
     #[test]
     fn test_long_ecc_encode_invalid_segment_parity_ratio() -> Result<(), TestError> {
         let message = b"Invalid Ratio".to_buffer()?;
+
         let result = encode(&message, 5, 10, 8);
+
         assert!(matches!(
             result,
             Err(LongEccEncodeError::InvalidSegmentParityRatio(8, 5))
         ));
+
         Ok(())
     }
 
@@ -424,14 +441,19 @@ mod tests {
         let parity: u8 = 2;
         let segment_length: u8 = 10;
         let segment_distance: u8 = 8;
+
         let encoded = encode(&message, parity, segment_length, segment_distance)?;
+
         assert!(encoded.len() > HEADER_SIZE + message.len());
+
         let header = LongEccHeader::from_bytes(&encoded)?;
+
         assert_eq!(header.parity, parity);
         assert_eq!(header.message_length as usize, message.len());
         assert_eq!(header.segment_length, segment_length);
         assert_eq!(header.segment_distance, segment_distance);
         assert_eq!(header.full_length as usize, encoded.len());
+
         Ok(())
     }
 
@@ -441,10 +463,14 @@ mod tests {
         let parity: u8 = 1;
         let segment_length: u8 = 7;
         let segment_distance: u8 = 5;
+
         let encoded = encode(&message, parity, segment_length, segment_distance)?;
+
         let header = LongEccHeader::from_bytes(&encoded)?;
+
         assert_ne!(header.last_segment_length, segment_length);
         assert_eq!(header.full_length as usize, encoded.len());
+
         Ok(())
     }
 
@@ -454,13 +480,17 @@ mod tests {
         let parity: u8 = 2;
         let segment_length: u8 = 10;
         let segment_distance: u8 = 8;
+
         let mut encoded = encode(&message, parity, segment_length, segment_distance)?;
+
         let header = correct_in_place(&mut encoded)?;
+
         assert_eq!(header.message_length as usize, message.len());
         assert_eq!(
             &encoded[HEADER_SIZE..HEADER_SIZE + message.len()],
             &message[..]
         );
+
         Ok(())
     }
 
@@ -470,14 +500,19 @@ mod tests {
         let parity: u8 = 2;
         let segment_length: u8 = 10;
         let segment_distance: u8 = 8;
+
         let mut encoded = encode(&message, parity, segment_length, segment_distance)?;
+
         encoded[HEADER_SIZE + 5] ^= 0b0000_0001;
+
         let header = correct_in_place(&mut encoded)?;
+
         assert_eq!(header.message_length as usize, message.len());
         assert_eq!(
             &encoded[HEADER_SIZE..HEADER_SIZE + message.len()],
             &message[..]
         );
+
         Ok(())
     }
 
@@ -487,14 +522,22 @@ mod tests {
         let parity: u8 = 2;
         let segment_length: u8 = 10;
         let segment_distance: u8 = 8;
+
         let mut encoded = encode(&message, parity, segment_length, segment_distance)?;
+
         let parity_start = HEADER_SIZE + message.len();
+
         encoded[parity_start + 1] ^= 0b0000_0010;
+
         let header = correct_in_place(&mut encoded)?;
+
         assert_eq!(header.message_length as usize, message.len());
+
         // We can't directly check the parity bytes, but if decode works, it's likely the parity was corrected.
         let decoded = decode(&encoded)?;
+
         assert_eq!(&decoded[..], &message[..]);
+
         Ok(())
     }
 
@@ -504,16 +547,21 @@ mod tests {
         let parity: u8 = 3;
         let segment_length: u8 = 12;
         let segment_distance: u8 = 8;
+
         let mut encoded = encode(&message, parity, segment_length, segment_distance)?;
+
         encoded[HEADER_SIZE + 1] ^= 0b0000_0001;
         encoded[HEADER_SIZE + 7] ^= 0b0000_0010;
         encoded[HEADER_SIZE + message.len() + 3] ^= 0b0000_0100;
+
         let header = correct_in_place(&mut encoded)?;
+
         assert_eq!(header.message_length as usize, message.len());
         assert_eq!(
             &encoded[HEADER_SIZE..HEADER_SIZE + message.len()],
             &message[..]
         );
+
         Ok(())
     }
 
@@ -523,11 +571,15 @@ mod tests {
         let parity: u8 = 2;
         let segment_length: u8 = 10;
         let segment_distance: u8 = 8;
+
         let mut encoded = encode(&message, parity, segment_length, segment_distance)?;
+
         encoded[HEADER_SIZE + 1] ^= 0b0000_0001;
         encoded[HEADER_SIZE + 3] ^= 0b0000_0010;
         encoded[HEADER_SIZE + 5] ^= 0b0000_0100; // More errors than can be corrected by parity=2
+
         let result = correct_in_place(&mut encoded);
+
         assert!(matches!(
             result,
             Err(LongEccDecodeError::RSDecodeError(
@@ -536,6 +588,7 @@ mod tests {
                 )
             ))
         ));
+
         Ok(())
     }
 
@@ -545,9 +598,13 @@ mod tests {
         let parity: u8 = 2;
         let segment_length: u8 = 10;
         let segment_distance: u8 = 8;
+
         let encoded = encode(&message, parity, segment_length, segment_distance)?;
+
         let decoded = decode(&encoded)?;
+
         assert_eq!(&decoded[..], &message[..]);
+
         Ok(())
     }
 
@@ -557,10 +614,15 @@ mod tests {
         let parity: u8 = 2;
         let segment_length: u8 = 10;
         let segment_distance: u8 = 8;
+
         let mut encoded = encode(&message, parity, segment_length, segment_distance)?;
+
         encoded[HEADER_SIZE + 2] ^= 0b0000_0001;
+
         let decoded = decode(&encoded)?;
+
         assert_eq!(&decoded[..], &message[..]);
+
         Ok(())
     }
 
@@ -570,10 +632,14 @@ mod tests {
         let parity: u8 = 1;
         let segment_length: u8 = 10;
         let segment_distance: u8 = 8;
+
         let mut encoded = encode(&message, parity, segment_length, segment_distance)?;
+
         encoded[HEADER_SIZE + 1] ^= 0b0000_0001;
         encoded[HEADER_SIZE + 3] ^= 0b0000_0010;
+
         let result = decode(&encoded);
+
         assert!(matches!(
             result,
             Err(LongEccDecodeError::RSDecodeError(
@@ -582,6 +648,7 @@ mod tests {
                 )
             ))
         ));
+
         Ok(())
     }
 
@@ -597,10 +664,15 @@ mod tests {
             crc32: 0,
             xxh64: 0,
         };
+
         let mut truncated = header.to_bytes()?.to_vec();
+
         truncated.extend_from_slice(&[0u8; 5]); // Only 5 message bytes instead of 10
+
         let result = decode(&truncated);
+
         eprintln!("{result:?}");
+
         assert!(matches!(
             result,
             Err(crate::LongEccDecodeError::RSDecodeError(
@@ -609,6 +681,7 @@ mod tests {
                 )
             ))
         ));
+
         Ok(())
     }
 
@@ -618,11 +691,17 @@ mod tests {
         let parity: u8 = 1;
         let segment_length: u8 = 10;
         let segment_distance: u8 = 8;
+
         let encoded = encode(&message, parity, segment_length, segment_distance)?;
+
         let mut incorrect_length = encoded.to_vec();
+
         incorrect_length.pop();
+
         let result = decode(&incorrect_length);
+
         assert!(result.is_err());
+
         Ok(())
     }
 
@@ -647,9 +726,13 @@ mod tests {
         let parity: u8 = 2;
         let segment_length: u8 = 5;
         let segment_distance: u8 = 10;
+
         let encoded = encode(&message, parity, segment_length, segment_distance)?;
+
         let header = LongEccHeader::from_bytes(&encoded)?;
+
         assert_eq!(header.segment_length, segment_distance); // segment_length is max(segment_length, segment_distance)
+
         Ok(())
     }
 
@@ -659,11 +742,16 @@ mod tests {
         let parity: u8 = 2;
         let segment_length: u8 = 10;
         let segment_distance: u8 = 8;
+
         let encoded = encode(&message, parity, segment_length, segment_distance)?;
+
         assert_eq!(encoded.len(), HEADER_SIZE + (usize::from(parity) << 1));
+
         let header = LongEccHeader::from_bytes(&encoded)?;
+
         assert_eq!(header.message_length, 0);
         assert_eq!(header.full_length as usize, encoded.len());
+
         Ok(())
     }
 
@@ -673,10 +761,14 @@ mod tests {
         let parity: u8 = 0;
         let segment_length: u8 = 10;
         let segment_distance: u8 = 8;
+
         let mut encoded = encode(&message, parity, segment_length, segment_distance)?;
+
         let header = correct_in_place(&mut encoded)?;
+
         assert_eq!(header.parity, 0);
         assert_eq!(&encoded[HEADER_SIZE..], &message[..]);
+
         Ok(())
     }
 
@@ -686,9 +778,13 @@ mod tests {
         let parity: u8 = 0;
         let segment_length: u8 = 10;
         let segment_distance: u8 = 8;
+
         let encoded = encode(&message, parity, segment_length, segment_distance)?;
+
         let decoded = decode(&encoded)?;
+
         assert_eq!(&decoded[..], &message[..]);
+
         Ok(())
     }
 }
@@ -720,9 +816,11 @@ mod encode_refactor_tests {
         let segment_distance = 8;
 
         let encoded = encode(&message, parity, segment_length, segment_distance)?;
+
         let decoded = decode(&encoded)?;
 
         assert_eq!(&decoded[..], &message[..]);
+
         Ok(())
     }
 
@@ -734,9 +832,11 @@ mod encode_refactor_tests {
         let segment_distance = 5;
 
         let encoded = encode(&message, parity, segment_length, segment_distance)?;
+
         let decoded = decode(&encoded)?;
 
         assert_eq!(&decoded[..], &message[..]);
+
         Ok(())
     }
 
@@ -748,9 +848,11 @@ mod encode_refactor_tests {
         let segment_distance = 8;
 
         let encoded = encode(&message, parity, segment_length, segment_distance)?;
+
         let decoded = decode(&encoded)?;
 
         assert_eq!(&decoded[..], &message[..]);
+
         Ok(())
     }
 
@@ -762,9 +864,11 @@ mod encode_refactor_tests {
         let segment_distance = 4;
 
         let encoded = encode(&message, parity, segment_length, segment_distance)?;
+
         let decoded = decode(&encoded)?;
 
         assert_eq!(&decoded[..], &message[..]);
+
         Ok(())
     }
 
@@ -776,9 +880,11 @@ mod encode_refactor_tests {
         let segment_distance = 40;
 
         let encoded = encode(&message, parity, segment_length, segment_distance)?;
+
         let decoded = decode(&encoded)?;
 
         assert_eq!(&decoded[..], &message[..]);
+
         Ok(())
     }
 
@@ -790,9 +896,11 @@ mod encode_refactor_tests {
         let segment_distance = 10;
 
         let encoded = encode(&message, parity, segment_length, segment_distance)?;
+
         let decoded = decode(&encoded)?;
 
         assert_eq!(&decoded[..], &message[..]);
+
         Ok(())
     }
 
@@ -805,9 +913,11 @@ mod encode_refactor_tests {
         let segment_distance = 10;
 
         let encoded = encode(&message, parity, segment_length, segment_distance)?;
+
         let decoded = decode(&encoded)?;
 
         assert_eq!(&decoded[..], &message[..]);
+
         Ok(())
     }
 
@@ -820,7 +930,9 @@ mod encode_refactor_tests {
 
         // This should fail with InvalidSegmentParityRatio
         let result = encode(&message, parity, segment_length, segment_distance);
+
         assert!(result.is_err());
+
         Ok(())
     }
 
@@ -832,9 +944,11 @@ mod encode_refactor_tests {
         let segment_distance = 67;
 
         let encoded = encode(&message, parity, segment_length, segment_distance)?;
+
         let decoded = decode(&encoded)?;
 
         assert_eq!(&decoded[..], &message[..]);
+
         Ok(())
     }
 
@@ -846,9 +960,11 @@ mod encode_refactor_tests {
         let segment_distance = 8;
 
         let encoded = encode(&message, parity, segment_length, segment_distance)?;
+
         let decoded = decode(&encoded)?;
 
         assert_eq!(&decoded[..], &message[..]);
+
         Ok(())
     }
 
@@ -859,12 +975,15 @@ mod encode_refactor_tests {
         let parity = 2;
         let segment_length = 10;
         let segment_distance = 8;
+
         // With 8 bytes data per segment (10-2*2), 32 bytes needs exactly 4 segments
 
         let encoded = encode(&message, parity, segment_length, segment_distance)?;
+
         let decoded = decode(&encoded)?;
 
         assert_eq!(&decoded[..], &message[..]);
+
         Ok(())
     }
 
@@ -876,9 +995,11 @@ mod encode_refactor_tests {
         let segment_distance = 12;
 
         let encoded = encode(&message, parity, segment_length, segment_distance)?;
+
         let decoded = decode(&encoded)?;
 
         assert_eq!(&decoded[..], &message[..]);
+
         Ok(())
     }
 
@@ -891,9 +1012,11 @@ mod encode_refactor_tests {
         let segment_distance = 15;
 
         let encoded = encode(&message, parity, segment_length, segment_distance)?;
+
         let decoded = decode(&encoded)?;
 
         assert_eq!(&decoded[..], &message[..]);
+
         Ok(())
     }
 
@@ -906,7 +1029,9 @@ mod encode_refactor_tests {
 
         // This should fail with InvalidSegmentParityRatio
         let result = encode(&message, parity, segment_length, segment_distance);
+
         assert!(result.is_err());
+
         Ok(())
     }
 
@@ -918,9 +1043,11 @@ mod encode_refactor_tests {
         let segment_distance = 128;
 
         let encoded = encode(&message, parity, segment_length, segment_distance)?;
+
         let decoded = decode(&encoded)?;
 
         assert_eq!(&decoded[..], &message[..]);
+
         Ok(())
     }
 
@@ -932,6 +1059,7 @@ mod encode_refactor_tests {
         let segment_distance = 12;
 
         let encoded = encode(&message, parity, segment_length, segment_distance)?;
+
         let header = LongEccHeader::from_bytes(&encoded)?;
 
         // Check header fields are correctly set
@@ -943,7 +1071,9 @@ mod encode_refactor_tests {
 
         // Decode and verify message integrity
         let decoded = decode(&encoded)?;
+
         assert_eq!(&decoded[..], &message[..]);
+
         Ok(())
     }
 
@@ -956,9 +1086,11 @@ mod encode_refactor_tests {
         let segment_distance = 10;
 
         let encoded = encode(&message, parity, segment_length, segment_distance)?;
+
         let decoded = decode(&encoded)?;
 
         assert_eq!(&decoded[..], &message[..]);
+
         Ok(())
     }
 
@@ -970,9 +1102,11 @@ mod encode_refactor_tests {
         let segment_distance = 4;
 
         let encoded = encode(&message, parity, segment_length, segment_distance)?;
+
         let decoded = decode(&encoded)?;
 
         assert_eq!(&decoded[..], &message[..]);
+
         Ok(())
     }
 }
@@ -1004,6 +1138,7 @@ mod correct_in_place_tests {
         let segment_distance = 25;
 
         let mut encoded = encode(&message, parity, segment_length, segment_distance)?;
+
         let header = correct_in_place(&mut encoded)?;
 
         assert_eq!(header.message_length as usize, message.len());
@@ -1011,6 +1146,7 @@ mod correct_in_place_tests {
             &encoded[HEADER_SIZE..HEADER_SIZE + message.len()],
             &message[..]
         );
+
         Ok(())
     }
 
@@ -1023,6 +1159,7 @@ mod correct_in_place_tests {
         let segment_distance = 15;
 
         let mut encoded = encode(&message, parity, segment_length, segment_distance)?;
+
         let header = correct_in_place(&mut encoded)?;
 
         assert_eq!(header.message_length as usize, message.len());
@@ -1030,6 +1167,7 @@ mod correct_in_place_tests {
             &encoded[HEADER_SIZE..HEADER_SIZE + message.len()],
             &message[..]
         );
+
         Ok(())
     }
 
@@ -1045,16 +1183,19 @@ mod correct_in_place_tests {
 
         // Introduce an error in what should be a middle segment
         let error_position = HEADER_SIZE + 30;
+
         if error_position < encoded.len() {
             encoded[error_position] ^= 0b0000_0001;
         }
 
         let header = correct_in_place(&mut encoded)?;
+
         assert_eq!(header.message_length as usize, message.len());
         assert_eq!(
             &encoded[HEADER_SIZE..HEADER_SIZE + message.len()],
             &message[..]
         );
+
         Ok(())
     }
 
@@ -1066,6 +1207,7 @@ mod correct_in_place_tests {
         let segment_distance = 12;
 
         let mut encoded = encode(&message, parity, segment_length, segment_distance)?;
+
         let header = correct_in_place(&mut encoded)?;
 
         assert_eq!(header.message_length as usize, message.len());
@@ -1073,6 +1215,7 @@ mod correct_in_place_tests {
             &encoded[HEADER_SIZE..HEADER_SIZE + message.len()],
             &message[..]
         );
+
         Ok(())
     }
 
@@ -1087,17 +1230,20 @@ mod correct_in_place_tests {
 
         // Introduce errors in parity bytes of first segment
         let parity_start = HEADER_SIZE + message.len();
+
         if parity_start + 1 < encoded.len() {
             encoded[parity_start] ^= 0b0000_0001;
             encoded[parity_start + 1] ^= 0b0000_0010;
         }
 
         let header = correct_in_place(&mut encoded)?;
+
         assert_eq!(header.message_length as usize, message.len());
         assert_eq!(
             &encoded[HEADER_SIZE..HEADER_SIZE + message.len()],
             &message[..]
         );
+
         Ok(())
     }
 }

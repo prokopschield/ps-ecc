@@ -33,6 +33,7 @@ mod tests {
             degree: 3,
             ..Default::default()
         };
+
         p.coefficients[3] = 5;
 
         p.set(1, 7);
@@ -47,6 +48,7 @@ mod tests {
             degree: 2,
             ..Default::default()
         };
+
         p.coefficients[2] = 3;
 
         p.set(2, 9);
@@ -61,6 +63,7 @@ mod tests {
             degree: 3,
             ..Default::default()
         };
+
         p.coefficients[0] = 1;
         p.coefficients[1] = 2;
         p.coefficients[3] = 4;
@@ -77,6 +80,7 @@ mod tests {
             degree: 1,
             ..Default::default()
         };
+
         p.coefficients[1] = 1;
 
         p.set(5, 3);
@@ -91,6 +95,7 @@ mod tests {
             degree: 2,
             ..Default::default()
         };
+
         p.coefficients[2] = 1;
 
         p.set(5, 0);
@@ -105,6 +110,7 @@ mod tests {
             degree: 0,
             ..Default::default()
         };
+
         p.coefficients[0] = 5;
 
         p.set(0, 0);

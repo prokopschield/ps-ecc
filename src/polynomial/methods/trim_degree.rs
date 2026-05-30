@@ -22,12 +22,14 @@ mod tests {
             degree: 3,
             ..Default::default()
         };
+
         p.coefficients[0] = 1;
         p.coefficients[1] = 2;
         p.coefficients[2] = 3;
         // degree 3 coefficient is 0
 
         p.trim_degree();
+
         assert_eq!(p.degree, 2);
     }
 
@@ -37,10 +39,12 @@ mod tests {
             degree: 5,
             ..Default::default()
         };
+
         p.coefficients[0] = 1;
         // coefficients 1-5 are all 0
 
         p.trim_degree();
+
         assert_eq!(p.degree, 0);
     }
 
@@ -50,11 +54,13 @@ mod tests {
             degree: 2,
             ..Default::default()
         };
+
         p.coefficients[0] = 1;
         p.coefficients[1] = 2;
         p.coefficients[2] = 3;
 
         p.trim_degree();
+
         assert_eq!(p.degree, 2);
     }
 
@@ -63,6 +69,7 @@ mod tests {
         let mut p = Polynomial::default();
 
         p.trim_degree();
+
         assert_eq!(p.degree, 0);
     }
 
@@ -75,6 +82,7 @@ mod tests {
         // all coefficients are 0
 
         p.trim_degree();
+
         assert_eq!(p.degree, 0);
     }
 }

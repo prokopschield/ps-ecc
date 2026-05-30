@@ -10,6 +10,7 @@ pub const LOG_TABLE: [u8; FIELD_SIZE] = {
     let mut log = [0; FIELD_SIZE];
     let mut current = 1u16; // Start with α^0 = 1
     let mut i: u8 = 0;
+
     while i < 255 {
         log[current as usize] = i;
         current <<= 1; // Multiply by α (shift left in the field)
@@ -19,6 +20,7 @@ pub const LOG_TABLE: [u8; FIELD_SIZE] = {
         current &= 0xff; // Keep within 8 bits
         i += 1;
     }
+
     log
 };
 
@@ -35,6 +37,7 @@ pub const ANTILOG_TABLE: [NonZero<u8>; FIELD_SIZE] = {
     let mut antilog = [nonzero(1); FIELD_SIZE];
     let mut current = 1u16; // Start with α^0 = 1
     let mut i = 0;
+
     while i < 255 {
         antilog[i] = nonzero((current & 0xff) as u8);
         current <<= 1;
@@ -43,6 +46,7 @@ pub const ANTILOG_TABLE: [NonZero<u8>; FIELD_SIZE] = {
         }
         i += 1;
     }
+
     // antilog[255] = 1; // uncomment if default value changes, see above
     // α^255 = 1 due to field order
     antilog
@@ -63,9 +67,11 @@ pub const fn mul(a: u8, b: u8) -> u8 {
     if a == 0 || b == 0 {
         return 0;
     }
+
     let log_a = LOG_TABLE[a as usize] as u16;
     let log_b = LOG_TABLE[b as usize] as u16;
     let sum = (log_a + log_b) % 255;
+
     ANTILOG_TABLE[sum as usize].get()
 }
 

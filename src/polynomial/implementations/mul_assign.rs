@@ -102,12 +102,15 @@ mod tests {
         let c = 5u8;
 
         let mut sum = (a + b).expect("addition succeeds");
+
         sum *= c;
 
         let mut a_scaled = a;
+
         a_scaled *= c;
 
         let mut b_scaled = b;
+
         b_scaled *= c;
 
         let sum_of_scaled = (a_scaled + b_scaled).expect("addition succeeds");
@@ -125,10 +128,12 @@ mod tests {
         let b = 7u8;
 
         let mut left = original;
+
         left *= a;
         left *= b;
 
         let mut right = original;
+
         right *= mul(a, b);
 
         assert_eq!(left, right);
@@ -137,6 +142,7 @@ mod tests {
     #[test]
     fn mul_assign_high_degree() {
         let mut coeffs = [0u8; 255];
+
         coeffs[0] = 1;
         coeffs[254] = 1;
 

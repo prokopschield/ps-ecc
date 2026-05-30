@@ -44,6 +44,7 @@ mod tests {
 
         // Verify via div_rem
         let (_quot, expected_rem) = a.div_rem(b).expect("division succeeds");
+
         assert_eq!(rem, expected_rem);
     }
 

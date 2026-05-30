@@ -7,6 +7,7 @@ impl ParityBytes {
     #[must_use]
     pub fn as_mut_slice(&mut self) -> &mut [u8] {
         let len = self.len();
+
         &mut self.data[..len]
     }
 }

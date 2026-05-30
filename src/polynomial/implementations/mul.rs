@@ -33,6 +33,7 @@ fn mul_coefficient_slices(lhs: &[u8], rhs: &[u8]) -> Result<Polynomial, Polynomi
     for (i, &lhs_coef) in lhs.iter().enumerate() {
         for (j, &rhs_coef) in rhs.iter().enumerate() {
             let k = i + j;
+
             result.coefficients[k] = add(result.coefficients[k], mul(lhs_coef, rhs_coef));
         }
     }
@@ -195,6 +196,7 @@ mod tests {
     fn mul_degree_overflow() {
         // Create two polynomials whose product exceeds max degree
         let mut coeffs = [0u8; 200];
+
         coeffs[199] = 1; // degree 199
 
         let a = Polynomial::try_from(&coeffs[..]).expect("valid polynomial");
@@ -225,6 +227,7 @@ mod tests {
     fn mul_max_degree_exactly() {
         // 127 + 127 = 254, which is exactly MAX_DEGREE
         let mut coeffs = [0u8; 128];
+
         coeffs[127] = 1;
 
         let a = Polynomial::try_from(&coeffs[..]).expect("valid polynomial");
@@ -277,6 +280,7 @@ mod tests {
     fn mul_slice_degree_overflow() {
         let a = Polynomial::try_from(&[1u8][..]).expect("valid polynomial");
         let mut long_slice = [0u8; 256];
+
         long_slice[255] = 1; // degree 255, which exceeds MAX_DEGREE
 
         let result = a.mul(long_slice.as_slice());
@@ -288,6 +292,7 @@ mod tests {
     fn mul_long_slice_with_trailing_zeros() {
         let a = Polynomial::try_from(&[1u8, 2][..]).expect("valid polynomial");
         let mut long_slice = [0u8; 300];
+
         long_slice[0] = 3;
         long_slice[1] = 4; // effective degree is 1, despite slice length 300
 
