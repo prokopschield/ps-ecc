@@ -11,6 +11,13 @@ ps-buffer = "0.1.0-21"
 thiserror = "2.0.17"
 xxhash-rust = { version = "0.8.15", features = ["xxh64"] }
 
+[lints]
+clippy.expect_used = "deny"
+clippy.nursery = { level = "warn", priority = -1 }
+clippy.pedantic = { level = "warn", priority = -1 }
+clippy.unwrap_used = "deny"
+rust.unsafe_code = "deny"
+
 [profile.dev]
 opt-level = 3
 

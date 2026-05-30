@@ -342,6 +342,7 @@ impl ReedSolomon {
 }
 
 #[cfg(test)]
+#[allow(clippy::decimal_bitwise_operands)]
 mod tests {
     use super::*;
     use ps_buffer::ToBuffer;
