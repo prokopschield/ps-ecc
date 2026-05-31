@@ -58,8 +58,6 @@ pub enum RSConstructorError {
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum RSGenerateParityError {
     #[error(transparent)]
-    BufferError(#[from] BufferError),
-    #[error(transparent)]
     Division(#[from] PolynomialDivError),
     #[error(transparent)]
     SetCoefficients(#[from] PolynomialSetCoefficientsError),

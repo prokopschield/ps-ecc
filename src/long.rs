@@ -211,7 +211,7 @@ pub fn encode(
         // Generate and append parity for this segment
         let parity_data = rs.generate_parity(&codeword[index..segment_end])?;
 
-        codeword.extend_from_slice(&parity_data)?;
+        codeword.extend_from_slice(parity_data)?;
 
         // Move to next segment
         index += segment_distance;

@@ -7,7 +7,7 @@ use std::ops::Rem;
 
 pub use constants::*;
 use generator::generator_poly;
-use ps_buffer::{Buffer, ToBuffer};
+use ps_buffer::Buffer;
 pub use types::*;
 
 use crate::cow::Cow;
@@ -50,17 +50,15 @@ impl ReedSolomon {
 
     /// Generates parity bytes.
     /// # Errors
-    /// - `BufferError` if an allocation fails
     /// - [`RSGenerateParityError::Division`] if generator polynomial is zero (shouldn't happen)
-    pub fn generate_parity(&self, message: &[u8]) -> Result<Buffer, RSGenerateParityError> {
+    pub fn generate_parity(&self, message: &[u8]) -> Result<ParityBytes, RSGenerateParityError> {
         let mut p = Polynomial::default();
 
         p.set_coefficients(self.parity_bytes(), message)?;
 
-        p.rem(generator_poly(self.parity()))?
-            .first_n_coefficients(self.parity_bytes().into())
-            .to_buffer()
-            .map_err(Into::into)
+        let remainder = p.rem(generator_poly(self.parity()))?;
+
+        Ok(ParityBytes::new(&remainder, self.parity()))
     }
 
     /// Encodes a message into a codeword.
@@ -70,7 +68,7 @@ impl ReedSolomon {
     pub fn encode(&self, message: &[u8]) -> Result<Buffer, RSEncodeError> {
         let mut buffer = Buffer::with_capacity(message.len() + usize::from(self.parity_bytes()))?;
 
-        buffer.extend_from_slice(&self.generate_parity(message)?)?;
+        buffer.extend_from_slice(self.generate_parity(message)?)?;
         buffer.extend_from_slice(message)?;
 
         Ok(buffer)
@@ -451,14 +449,15 @@ mod tests {
 
         data.extend_from_slice(&message)?;
 
-        let mut parity = rs.generate_parity(&message)?;
+        let parity_poly = rs.generate_parity(&message)?;
+        let mut parity = Buffer::from_slice(parity_poly)?;
 
         data[2] ^= 1;
 
         ReedSolomon::correct_detached_in_place(&mut parity, &mut data)?;
 
         assert_eq!(data.as_slice(), message.as_slice());
-        assert_eq!(parity, rs.generate_parity(&message)?);
+        assert_eq!(parity.as_slice(), rs.generate_parity(&message)?.as_slice());
 
         Ok(())
     }
@@ -855,14 +854,15 @@ mod tests {
 
         data.extend_from_slice(&message)?;
 
-        let mut parity = rs.generate_parity(&message)?;
+        let parity_poly = rs.generate_parity(&message)?;
+        let mut parity = Buffer::from_slice(parity_poly)?;
 
         parity[1] ^= 8;
 
         ReedSolomon::correct_detached_in_place(&mut parity, &mut data)?;
 
         assert_eq!(data.as_slice(), message.as_slice());
-        assert_eq!(parity, rs.generate_parity(&message)?);
+        assert_eq!(parity.as_slice(), rs.generate_parity(&message)?.as_slice());
 
         Ok(())
     }
@@ -875,7 +875,8 @@ mod tests {
 
         data.extend_from_slice(&message)?;
 
-        let mut parity = rs.generate_parity(&message)?;
+        let parity_poly = rs.generate_parity(&message)?;
+        let mut parity = Buffer::from_slice(parity_poly)?;
 
         data[3] ^= 16;
         parity[0] ^= 4;
@@ -883,7 +884,7 @@ mod tests {
         ReedSolomon::correct_detached_in_place(&mut parity, &mut data)?;
 
         assert_eq!(data.as_slice(), message.as_slice());
-        assert_eq!(parity, rs.generate_parity(&message)?);
+        assert_eq!(parity.as_slice(), rs.generate_parity(&message)?.as_slice());
 
         Ok(())
     }
@@ -896,7 +897,8 @@ mod tests {
 
         data.extend_from_slice(&message)?;
 
-        let mut parity = rs.generate_parity(&message)?;
+        let parity_poly = rs.generate_parity(&message)?;
+        let mut parity = Buffer::from_slice(parity_poly)?;
 
         data[0] ^= 1;
         data[2] ^= 2;
@@ -1148,7 +1150,8 @@ mod tests {
     fn test_correct_detached_with_errors_in_parity_only() -> Result<(), TestError> {
         let rs = ReedSolomon::new(3)?;
         let message = b"ParityOnly".to_buffer()?;
-        let mut parity = rs.generate_parity(&message)?;
+        let parity_poly = rs.generate_parity(&message)?;
+        let mut parity = Buffer::from_slice(parity_poly)?;
 
         parity[0] ^= 2;
         parity[2] ^= 4;
