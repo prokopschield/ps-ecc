@@ -32,22 +32,23 @@ impl LongEccHeader {
             ));
         }
 
-        // Extract data and parity portions
-        let data_bytes = &bytes[0..24];
-        let parity_bytes = &bytes[24..32];
+        // Copy data to stack array for in-place correction
+        let mut data = [0u8; 24];
 
-        // Correct errors in header data using Reed-Solomon
-        let corrected_data = ReedSolomon::correct_detached(parity_bytes, data_bytes)?;
+        data.copy_from_slice(&bytes[0..24]);
+
+        // Correct errors in header data using Reed-Solomon (no heap allocation)
+        ReedSolomon::correct_detached_data_in_place(&bytes[24..32], &mut data)?;
 
         let header = Self {
-            full_length: u32::from_le_bytes(corrected_data[0..4].try_into()?),
-            message_length: u32::from_le_bytes(corrected_data[4..8].try_into()?),
-            parity: corrected_data[8],
-            segment_length: corrected_data[9],
-            segment_distance: corrected_data[10],
-            last_segment_length: corrected_data[11],
-            crc32: u32::from_le_bytes(corrected_data[12..16].try_into()?),
-            xxh64: u64::from_le_bytes(corrected_data[16..24].try_into()?),
+            full_length: u32::from_le_bytes(data[0..4].try_into()?),
+            message_length: u32::from_le_bytes(data[4..8].try_into()?),
+            parity: data[8],
+            segment_length: data[9],
+            segment_distance: data[10],
+            last_segment_length: data[11],
+            crc32: u32::from_le_bytes(data[12..16].try_into()?),
+            xxh64: u64::from_le_bytes(data[16..24].try_into()?),
         };
 
         Ok(header)
