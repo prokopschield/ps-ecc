@@ -1,11 +1,14 @@
 use crate::{LongEccDecodeError, ReedSolomon, MAX_PARITY_BYTES};
 
+use super::checksums::xxh64;
 use super::fast_validate::fast_validate;
 use super::{LongEccHeader, HEADER_SIZE};
 
 /// Correct errors in-place in a codeword
 pub fn correct_in_place(codeword: &mut [u8]) -> Result<LongEccHeader, LongEccDecodeError> {
-    use LongEccDecodeError::{InvalidCodeword, ReadDataError, ReadParityError};
+    use LongEccDecodeError::{
+        IntegrityCheckFailed, InvalidCodeword, ReadDataError, ReadParityError,
+    };
 
     // Fast path - skip correction if data is valid
     if matches!(fast_validate(codeword), Ok(true)) {
@@ -55,6 +58,13 @@ pub fn correct_in_place(codeword: &mut [u8]) -> Result<LongEccHeader, LongEccDec
 
         // Correct this segment
         ReedSolomon::correct_detached_in_place(parity, data)?;
+    }
+
+    // Reed-Solomon can miscorrect a segment carrying more errors than its parity
+    // can fix, landing on a wrong-but-valid codeword. The hash is the only guard,
+    // so re-verify it after correction rather than trusting the corrected bytes.
+    if header.parity > 0 && xxh64(&codeword[HEADER_SIZE..]) != header.xxh64 {
+        return Err(IntegrityCheckFailed);
     }
 
     Ok(header)
@@ -291,6 +301,33 @@ mod tests {
             &encoded[HEADER_SIZE..HEADER_SIZE + message.len()],
             &message[..]
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_correct_in_place_rejects_hash_mismatch() -> Result<(), TestError> {
+        let message = b"Integrity guard after correction".to_buffer()?;
+        let parity = 2;
+        let segment_length = 16;
+        let segment_distance = 12;
+
+        let mut encoded = encode(&message, parity, segment_length, segment_distance)?;
+
+        // Drive a genuine miscorrection: a segment with fewer than `t` nonzero
+        // symbols Reed-Solomon-decodes to the all-zeros codeword. Zeroing the body
+        // and leaving a single nonzero symbol makes the corrector actively rewrite
+        // it to all zeros and report success, yet the corrected body cannot match
+        // the hash stored in the (untouched) header. The guard must reject it.
+        encoded[HEADER_SIZE..].fill(0);
+        encoded[HEADER_SIZE] = 1;
+
+        let result = correct_in_place(&mut encoded);
+
+        assert!(matches!(
+            result,
+            Err(LongEccDecodeError::IntegrityCheckFailed)
+        ));
 
         Ok(())
     }

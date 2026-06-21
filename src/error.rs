@@ -168,6 +168,8 @@ pub enum LongEccEncodeError {
 pub enum LongEccDecodeError {
     #[error(transparent)]
     BufferError(#[from] BufferError),
+    #[error("Integrity check failed after correction")]
+    IntegrityCheckFailed,
     #[error("Codeword is invalid.")]
     InvalidCodeword,
     #[error(transparent)]
