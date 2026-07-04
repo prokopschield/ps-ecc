@@ -52,7 +52,7 @@ pub fn validate(received: &[u8], parity: u8) -> bool {
 
         rs.validate(received).is_none()
     } else {
-        long::fast_validate(received).unwrap_or_default()
+        matches!(long::fast_validate(received), Ok(Some(_)))
     }
 }
 

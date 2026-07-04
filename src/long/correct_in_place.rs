@@ -11,8 +11,8 @@ pub fn correct_in_place(codeword: &mut [u8]) -> Result<LongEccHeader, LongEccDec
     };
 
     // Fast path - skip correction if data is valid
-    if matches!(fast_validate(codeword), Ok(true)) {
-        return Ok(LongEccHeader::from_bytes(codeword)?);
+    if let Ok(Some(header)) = fast_validate(codeword) {
+        return Ok(header);
     }
 
     // Parse and correct header
