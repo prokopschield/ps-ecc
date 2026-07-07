@@ -8,8 +8,7 @@ use crate::{codeword::Codeword, long, DecodeError, EncodeError, ReedSolomon};
 /// - `RSEncodeError` is returned if encoding fails for any reason.
 pub fn encode(message: &[u8], parity: u8) -> Result<Buffer, EncodeError> {
     if message.len() + (usize::from(parity) << 1) > 0xff {
-        let segment_length = 0xFF - (parity << 1);
-        let codeword = long::encode(message, parity, segment_length, segment_length)?;
+        let codeword = long::encode(message, parity, long::OverlapFactor::Simple)?;
 
         return Ok(codeword);
     }
@@ -20,6 +19,10 @@ pub fn encode(message: &[u8], parity: u8) -> Result<Buffer, EncodeError> {
 }
 
 /// Verifies the error-correcting code and returns the message.
+///
+/// Correctable corruption is repaired. For codewords longer than 255 bytes,
+/// bytes beyond the full length recorded in the header are discarded, so
+/// input rejected by [`validate`] may still decode successfully.
 /// # Errors
 /// - `InputTooLarge` is returned if `len(received)` > 255 bytes.
 /// - `InsufficientParityBytes` is returned if `parity > length / 2`.
@@ -39,7 +42,14 @@ pub fn decode(received: &[u8], parity: u8) -> Result<Codeword<'_>, DecodeError> 
 }
 
 #[must_use]
-/// Validates that a received codeword isn't corrupted.
+/// Validates that a received codeword is pristine.
+///
+/// Returns `true` only if the codeword is entirely uncorrupted; for codewords
+/// longer than 255 bytes, this includes carrying no bytes beyond the full
+/// length recorded in the header. A `true` result implies that [`decode`]
+/// succeeds. The converse does not hold: [`decode`] repairs correctable
+/// corruption and discards trailing bytes, so it accepts input that this
+/// function rejects.
 pub fn validate(received: &[u8], parity: u8) -> bool {
     if let Ok(length) = u8::try_from(received.len()) {
         if parity > length >> 1 {
@@ -83,8 +93,7 @@ mod tests {
 #[cfg(test)]
 mod validate_tests {
     use crate::{
-        long, validate, LongEccConstructorError, LongEccDecodeError, LongEccEncodeError,
-        LongEccToBytesError, RSEncodeError, ReedSolomon,
+        long, validate, LongEccDecodeError, LongEccEncodeError, RSEncodeError, ReedSolomon,
     };
 
     use ps_buffer::ToBuffer;
@@ -92,13 +101,9 @@ mod validate_tests {
     #[derive(thiserror::Error, Debug)]
     enum TestError {
         #[error(transparent)]
-        LongEccConstructor(#[from] LongEccConstructorError),
-        #[error(transparent)]
         LongEccEncode(#[from] LongEccEncodeError),
         #[error(transparent)]
         LongEccDecode(#[from] LongEccDecodeError),
-        #[error(transparent)]
-        LongEccToBytes(#[from] LongEccToBytesError),
         #[error(transparent)]
         Buffer(#[from] ps_buffer::BufferError),
         #[error(transparent)]
@@ -174,10 +179,8 @@ mod validate_tests {
     fn test_validate_long_data_valid_no_errors() -> Result<(), TestError> {
         let message = b"This is a longer message that will use long ECC".repeat(7);
         let parity = 2;
-        let segment_length = 20;
-        let segment_distance = 16;
 
-        let encoded = long::encode(&message, parity, segment_length, segment_distance)?;
+        let encoded = long::encode(&message, parity, long::OverlapFactor::Simple)?;
 
         // Valid data should pass validation
         assert!(validate(&encoded, parity));
@@ -189,10 +192,8 @@ mod validate_tests {
     fn test_validate_long_data_invalid_with_errors() -> Result<(), TestError> {
         let message = b"This is a longer message that will use long ECC".to_buffer()?;
         let parity = 2;
-        let segment_length = 20;
-        let segment_distance = 16;
 
-        let mut encoded = long::encode(&message, parity, segment_length, segment_distance)?;
+        let mut encoded = long::encode(&message, parity, long::OverlapFactor::Simple)?;
 
         // Introduce errors in the message
         encoded[32] ^= 1;
@@ -208,10 +209,8 @@ mod validate_tests {
     fn test_validate_long_data_fast_path_valid() -> Result<(), TestError> {
         let message = b"Fast path validation test".repeat(12);
         let parity = 1;
-        let segment_length = 15;
-        let segment_distance = 12;
 
-        let encoded = long::encode(&message, parity, segment_length, segment_distance)?;
+        let encoded = long::encode(&message, parity, long::OverlapFactor::Simple)?;
 
         // Valid data should pass fast validation
         assert!(validate(&encoded, parity));
@@ -278,10 +277,8 @@ mod validate_tests {
     fn test_validate_long_data_with_zero_parity() -> Result<(), TestError> {
         let message = b"Zero parity test".to_buffer()?;
         let parity = 0;
-        let segment_length = 15;
-        let segment_distance = 12;
 
-        let encoded = long::encode(&message, parity, segment_length, segment_distance)?;
+        let encoded = long::encode(&message, parity, long::OverlapFactor::Simple)?;
 
         // Zero parity should still validate correctly
         assert!(validate(&encoded, parity));
@@ -293,10 +290,8 @@ mod validate_tests {
     fn test_validate_long_data_header_corrupted() -> Result<(), TestError> {
         let message = b"Header corruption test".to_buffer()?;
         let parity = 2;
-        let segment_length = 15;
-        let segment_distance = 12;
 
-        let mut encoded = long::encode(&message, parity, segment_length, segment_distance)?;
+        let mut encoded = long::encode(&message, parity, long::OverlapFactor::Simple)?;
 
         // Corrupt header data
         encoded[0] ^= 1;
@@ -335,12 +330,11 @@ mod validate_tests {
 
     #[test]
     fn test_validate_long_data_corrupted_parity() -> Result<(), TestError> {
-        let message = b"Corrupted parity test".to_buffer()?;
+        // The message must exceed 255 bytes so that `validate` takes the long path.
+        let message = b"Corrupted parity test".repeat(13).to_buffer()?;
         let parity = 2;
-        let segment_length = 15;
-        let segment_distance = 12;
 
-        let mut encoded = long::encode(&message, parity, segment_length, segment_distance)?;
+        let mut encoded = long::encode(&message, parity, long::OverlapFactor::Simple)?;
 
         // Corrupt parity bytes
         let parity_start = 32 + message.len();
@@ -349,7 +343,8 @@ mod validate_tests {
             encoded[parity_start] ^= 1;
         }
 
-        // Corrupted parity should fail validation
+        // The checksum covers both the message and the parity, so corrupted
+        // parity bytes invalidate the codeword.
         assert!(!validate(&encoded, parity));
 
         Ok(())

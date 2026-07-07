@@ -1,9 +1,11 @@
 #![allow(clippy::module_name_repetitions)]
 
-use std::{array::TryFromSliceError, num::TryFromIntError};
+use std::num::TryFromIntError;
 
 use ps_buffer::BufferError;
 use thiserror::Error;
+
+use crate::long::{LongEccHeaderConstructorError, LongEccHeaderFromByteSliceError};
 
 #[derive(Error, Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum GFError {
@@ -126,36 +128,16 @@ pub enum EccError {
     DecodeError(#[from] DecodeError),
 }
 
-#[derive(Error, Debug, Clone)]
-pub enum LongEccConstructorError {
-    #[error("Received {0} header bytes, {0} < 16.")]
-    InsufficientHeaderBytes(u8),
-    #[error(transparent)]
-    RSDecodeError(#[from] RSDecodeError),
-    #[error(transparent)]
-    TryFromIntError(#[from] TryFromIntError),
-    #[error(transparent)]
-    TryFromSliceError(#[from] TryFromSliceError),
-}
-
-#[derive(Error, Debug, Clone, PartialEq, Eq)]
-pub enum LongEccToBytesError {
-    #[error(transparent)]
-    RSConstructorError(#[from] RSConstructorError),
-    #[error(transparent)]
-    RSGenerateParityError(#[from] RSGenerateParityError),
-}
-
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum LongEccEncodeError {
     #[error(transparent)]
     BufferError(#[from] BufferError),
     #[error("Parity {0} >= 64, which is too high.")]
     InvalidParity(u8),
-    #[error("Invalid segment-to-parity ratio: {0} < 2 * {1}")]
+    #[error("Invalid segment-to-parity ratio: {0} <= 2 * {1}")]
     InvalidSegmentParityRatio(u8, u8),
-    #[error(transparent)]
-    LongEccToBytesError(#[from] LongEccToBytesError),
+    #[error("Long ECC Header construction failed: {0}")]
+    LongEccHeaderCtor(#[from] LongEccHeaderConstructorError),
     #[error(transparent)]
     RSConstructorError(#[from] RSConstructorError),
     #[error(transparent)]
@@ -172,8 +154,8 @@ pub enum LongEccDecodeError {
     IntegrityCheckFailed,
     #[error("Codeword is invalid.")]
     InvalidCodeword,
-    #[error(transparent)]
-    LongEccConstructorError(#[from] LongEccConstructorError),
+    #[error("Failed to decode header: {0}")]
+    HeaderDecode(#[from] LongEccHeaderFromByteSliceError),
     #[error("Failed to read data bytes.")]
     ReadDataError,
     #[error("Failed to read parity bytes.")]

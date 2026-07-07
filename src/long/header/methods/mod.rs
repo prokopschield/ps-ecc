@@ -1,0 +1,22 @@
+mod checksum;
+mod from_byte_slice;
+mod from_bytes;
+mod full_length;
+mod header_checksum;
+mod header_parity;
+mod last_segment_length;
+mod magic;
+mod message_length;
+mod new;
+mod overlap_factor;
+mod parity;
+mod parity_bytes;
+mod segment_count;
+mod segment_distance;
+mod segment_length;
+mod to_bytes;
+mod version;
+
+pub use from_byte_slice::LongEccHeaderFromByteSliceError;
+pub use from_bytes::LongEccHeaderFromBytesError;
+pub use new::LongEccHeaderConstructorError;
