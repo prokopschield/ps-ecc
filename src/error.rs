@@ -79,7 +79,7 @@ pub enum RSComputeErrorsError {
     GFError(#[from] GFError),
     #[error(transparent)]
     EuclideanError(#[from] EuclideanError),
-    #[error("Too many errors, input in unrecoverable.")]
+    #[error("Too many errors; input is unrecoverable.")]
     TooManyErrors,
     #[error("The error locator derivative evaluated to zero.")]
     ZeroErrorLocatorDerivative,
