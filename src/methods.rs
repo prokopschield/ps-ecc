@@ -3,9 +3,16 @@ use ps_buffer::Buffer;
 use crate::{codeword::Codeword, long, DecodeError, EncodeError, ReedSolomon};
 
 /// Encodes a message by adding an error-correcting code.
+///
+/// Messages longer than `255 - 2 * parity` bytes are encoded in the long ECC
+/// format; all other messages become a single Reed-Solomon codeword.
 /// # Errors
-/// - `RSConstructorError` is returned if `len(message) + 2 * parity` > `255`.
-/// - `RSEncodeError` is returned if encoding fails for any reason.
+/// For messages that fit a single codeword:
+/// - `RSConstructorError` is returned if `parity` exceeds [`crate::MAX_PARITY`].
+/// - `RSEncodeError` is returned if encoding fails.
+///
+/// For longer messages:
+/// - `LongEccEncodeError` is returned if long encoding fails.
 pub fn encode(message: &[u8], parity: u8) -> Result<Buffer, EncodeError> {
     if message.len() + (usize::from(parity) << 1) > 0xff {
         let codeword = long::encode(message, parity, long::OverlapFactor::Simple)?;
@@ -21,12 +28,17 @@ pub fn encode(message: &[u8], parity: u8) -> Result<Buffer, EncodeError> {
 /// Verifies the error-correcting code and returns the message.
 ///
 /// Correctable corruption is repaired. For codewords longer than 255 bytes,
+/// the `parity` argument is ignored, since the header records the parity, and
 /// bytes beyond the full length recorded in the header are discarded, so
 /// input rejected by [`validate`] may still decode successfully.
 /// # Errors
-/// - `InputTooLarge` is returned if `len(received)` > 255 bytes.
+/// For codewords of at most 255 bytes:
 /// - `InsufficientParityBytes` is returned if `parity > length / 2`.
-/// - `RSDecodeError` is returned if decoding fails for any reason.
+/// - `RSConstructorError` is returned if `parity` otherwise exceeds [`crate::MAX_PARITY`].
+/// - `RSDecodeError` is returned if decoding fails.
+///
+/// For longer codewords:
+/// - `LongEccDecodeError` is returned if decoding fails.
 pub fn decode(received: &[u8], parity: u8) -> Result<Codeword<'_>, DecodeError> {
     if let Ok(length) = u8::try_from(received.len()) {
         if parity > length >> 1 {
