@@ -1,11 +1,41 @@
+use std::cmp::Ordering;
+use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 
 use ps_buffer::{Buffer, BufferError, SharedBuffer};
 
-#[derive(Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+/// Equality, ordering, and hashing compare the referenced bytes, so a
+/// [`Cow::Borrowed`] and a [`Cow::Owned`] with the same content are equal.
+#[derive(Debug)]
 pub enum Cow<'lt> {
     Borrowed(&'lt [u8]),
     Owned(SharedBuffer),
+}
+
+impl PartialEq for Cow<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        **self == **other
+    }
+}
+
+impl Eq for Cow<'_> {}
+
+impl PartialOrd for Cow<'_> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Cow<'_> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        (**self).cmp(&**other)
+    }
+}
+
+impl Hash for Cow<'_> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        (**self).hash(state);
+    }
 }
 
 impl Cow<'_> {
@@ -48,5 +78,65 @@ impl From<Buffer> for Cow<'_> {
 impl From<SharedBuffer> for Cow<'_> {
     fn from(value: SharedBuffer) -> Self {
         Self::Owned(value)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::hash::{DefaultHasher, Hash, Hasher};
+
+    use ps_buffer::Buffer;
+
+    use super::Cow;
+
+    type TestError = Box<dyn std::error::Error>;
+
+    fn hash(value: &Cow) -> u64 {
+        let mut hasher = DefaultHasher::new();
+
+        value.hash(&mut hasher);
+
+        hasher.finish()
+    }
+
+    #[test]
+    fn test_eq_across_variants_with_same_content() -> Result<(), TestError> {
+        let borrowed = Cow::Borrowed(b"abc");
+        let owned = Cow::Owned(Buffer::from_slice(b"abc")?.share());
+
+        assert_eq!(borrowed, owned);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_ne_for_different_content() -> Result<(), TestError> {
+        let borrowed = Cow::Borrowed(b"abc");
+        let owned = Cow::Owned(Buffer::from_slice(b"abd")?.share());
+
+        assert_ne!(borrowed, owned);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_hash_agrees_across_variants() -> Result<(), TestError> {
+        let borrowed = Cow::Borrowed(b"abc");
+        let owned = Cow::Owned(Buffer::from_slice(b"abc")?.share());
+
+        assert_eq!(hash(&borrowed), hash(&owned));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_ord_compares_content_across_variants() -> Result<(), TestError> {
+        let borrowed = Cow::Borrowed(b"b");
+        let owned = Cow::Owned(Buffer::from_slice(b"a")?.share());
+
+        assert!(borrowed > owned);
+        assert!(owned < borrowed);
+
+        Ok(())
     }
 }
