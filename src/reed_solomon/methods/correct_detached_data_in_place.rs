@@ -1,13 +1,24 @@
-use crate::{RSDecodeError, ReedSolomon, MAX_PARITY_BYTES};
+use crate::{RSConstructorError, RSDecodeError, ReedSolomon, MAX_PARITY_BYTES};
 
 impl ReedSolomon {
     /// Corrects a message based on detached parity bytes.
     /// # Errors
-    /// - [`RSDecodeError`] is returned if `data` is not recoverable.
+    /// - [`RSConstructorError`] is returned if `parity` holds more than
+    ///   [`MAX_PARITY_BYTES`] bytes.
+    /// - [`std::num::TryFromIntError`] is returned if `parity` and `data`
+    ///   together hold more than 255 bytes.
+    /// - [`RSComputeErrorsError`](crate::RSComputeErrorsError) is propagated
+    ///   from [`ReedSolomon::compute_errors`].
+    /// - [`RSDecodeError::TooManyErrors`] is returned if the corrected bytes
+    ///   fail validation.
     pub fn correct_detached_data_in_place(
         parity: &[u8],
         data: &mut [u8],
     ) -> Result<(), RSDecodeError> {
+        if parity.len() > usize::from(MAX_PARITY_BYTES) {
+            return Err(RSConstructorError::ParityTooHigh.into());
+        }
+
         let parity_len = parity.len();
         let num_parity = u8::try_from(parity_len >> 1)?;
         let length = u8::try_from(parity_len + data.len())?;
@@ -44,7 +55,7 @@ impl ReedSolomon {
 mod tests {
     use ps_buffer::ToBuffer;
 
-    use crate::{ReedSolomon, MAX_PARITY};
+    use crate::{RSConstructorError, RSDecodeError, ReedSolomon, MAX_PARITY};
 
     type TestError = Box<dyn std::error::Error>;
 
@@ -335,6 +346,46 @@ mod tests {
         assert_eq!(&data[..], &message[..]);
 
         Ok(())
+    }
+
+    #[test]
+    fn rejects_oversized_parity() {
+        // Without the length guard, a 127-byte parity slice overflows the
+        // 126-byte stack array used for post-correction validation, and a
+        // 130-byte slice with one corrupted data byte panics while locating
+        // the error past position 126.
+        for parity_len in [127usize, 128, 130] {
+            let parity = vec![0u8; parity_len];
+
+            let mut data = [1u8];
+
+            let result = ReedSolomon::correct_detached_data_in_place(&parity, &mut data);
+
+            assert_eq!(
+                result,
+                Err(RSDecodeError::RSConstructorError(
+                    RSConstructorError::ParityTooHigh
+                ))
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_oversized_parity_with_empty_data() {
+        // The combined length (130) fits in a `u8`, so only the parity
+        // length guard rejects this input.
+        let parity = vec![0u8; 130];
+
+        let mut data = [];
+
+        let result = ReedSolomon::correct_detached_data_in_place(&parity, &mut data);
+
+        assert_eq!(
+            result,
+            Err(RSDecodeError::RSConstructorError(
+                RSConstructorError::ParityTooHigh
+            ))
+        );
     }
 
     #[test]

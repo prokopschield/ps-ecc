@@ -1,14 +1,25 @@
-use crate::{RSDecodeError, ReedSolomon};
+use crate::{RSConstructorError, RSDecodeError, ReedSolomon, MAX_PARITY_BYTES};
 
 impl ReedSolomon {
     /// Corrects a message based on detached parity bytes.
     /// Also corrects the parity bytes.
     /// # Errors
-    /// - [`RSDecodeError`] is propagated from [`ReedSolomon::compute_errors`].
+    /// - [`RSConstructorError`] is returned if `parity` holds more than
+    ///   [`MAX_PARITY_BYTES`] bytes.
+    /// - [`std::num::TryFromIntError`] is returned if `parity` and `data`
+    ///   together hold more than 255 bytes.
+    /// - [`RSComputeErrorsError`](crate::RSComputeErrorsError) is propagated
+    ///   from [`ReedSolomon::compute_errors`].
+    /// - [`RSDecodeError::TooManyErrors`] is returned if the corrected bytes
+    ///   fail validation.
     pub fn correct_detached_in_place(
         parity: &mut [u8],
         data: &mut [u8],
     ) -> Result<(), RSDecodeError> {
+        if parity.len() > usize::from(MAX_PARITY_BYTES) {
+            return Err(RSConstructorError::ParityTooHigh.into());
+        }
+
         let parity_bytes = parity.len();
         let num_parity = u8::try_from(parity_bytes >> 1)?;
         let length = u8::try_from(parity_bytes + data.len())?;
@@ -32,7 +43,10 @@ impl ReedSolomon {
 mod tests {
     use ps_buffer::{Buffer, ToBuffer};
 
-    use crate::{RSComputeErrorsError, RSDecodeError, ReedSolomon};
+    use crate::{
+        RSComputeErrorsError, RSConstructorError, RSDecodeError, ReedSolomon, MAX_PARITY,
+        MAX_PARITY_BYTES,
+    };
 
     type TestError = Box<dyn std::error::Error>;
 
@@ -98,6 +112,49 @@ mod tests {
         assert_eq!(parity.as_slice(), rs.generate_parity(&message)?.as_slice());
 
         Ok(())
+    }
+
+    #[test]
+    fn test_correct_both_detached_in_place_max_parity() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(MAX_PARITY)?;
+        let message = b"MaxParityInPlace".to_buffer()?;
+        let mut data = message.clone()?;
+
+        let parity_poly = rs.generate_parity(&message)?;
+        let mut parity = Buffer::from_slice(parity_poly)?;
+
+        assert_eq!(parity.len(), usize::from(MAX_PARITY_BYTES));
+
+        data[0] ^= 0xFF;
+
+        ReedSolomon::correct_detached_in_place(&mut parity, &mut data)?;
+
+        assert_eq!(data.as_slice(), message.as_slice());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_correct_both_detached_in_place_rejects_oversized_parity() {
+        // A parity slice with 64 nonzero bytes forms a 64-error pattern
+        // relative to the all-zero codeword; without the length guard, the
+        // 64th located error writes past the 63-element position array.
+        for parity_len in [127usize, 128, 130] {
+            let mut parity = vec![0u8; parity_len];
+
+            parity[..64].fill(1);
+
+            let mut data = [0u8; 10];
+
+            let result = ReedSolomon::correct_detached_in_place(&mut parity, &mut data);
+
+            assert_eq!(
+                result,
+                Err(RSDecodeError::RSConstructorError(
+                    RSConstructorError::ParityTooHigh
+                ))
+            );
+        }
     }
 
     #[test]
