@@ -1,64 +1,11 @@
-use ps_buffer::Buffer;
-
-use crate::{codeword::Codeword, long, DecodeError, EncodeError, ReedSolomon};
-
-/// Encodes a message by adding an error-correcting code.
-///
-/// Messages longer than `255 - 2 * parity` bytes are encoded in the long ECC
-/// format; all other messages become a single Reed-Solomon codeword.
-/// # Errors
-/// For messages that fit a single codeword:
-/// - `RSConstructorError` is returned if `parity` exceeds [`crate::MAX_PARITY`].
-/// - `RSEncodeError` is returned if encoding fails.
-///
-/// For longer messages:
-/// - `LongEccEncodeError` is returned if long encoding fails.
-pub fn encode(message: &[u8], parity: u8) -> Result<Buffer, EncodeError> {
-    if message.len() + (usize::from(parity) << 1) > 0xff {
-        let codeword = long::encode(message, parity, long::OverlapFactor::Simple)?;
-
-        return Ok(codeword);
-    }
-
-    let rs = ReedSolomon::new(parity)?;
-
-    Ok(rs.encode(message)?)
-}
-
-/// Verifies the error-correcting code and returns the message.
-///
-/// Correctable corruption is repaired. For codewords longer than 255 bytes,
-/// the `parity` argument is ignored, since the header records the parity, and
-/// bytes beyond the full length recorded in the header are discarded, so
-/// input rejected by [`validate`] may still decode successfully.
-/// # Errors
-/// For codewords of at most 255 bytes:
-/// - `InsufficientParityBytes` is returned if `parity > length / 2`.
-/// - `RSConstructorError` is returned if `parity` otherwise exceeds [`crate::MAX_PARITY`].
-/// - `RSDecodeError` is returned if decoding fails.
-///
-/// For longer codewords:
-/// - `LongEccDecodeError` is returned if decoding fails.
-pub fn decode(received: &[u8], parity: u8) -> Result<Codeword<'_>, DecodeError> {
-    if let Ok(length) = u8::try_from(received.len()) {
-        if parity > length >> 1 {
-            return Err(DecodeError::InsufficientParityBytes(parity, length));
-        }
-
-        let rs = ReedSolomon::new(parity)?;
-
-        Ok(rs.decode(received)?)
-    } else {
-        Ok(long::decode(received)?)
-    }
-}
+use crate::{long, ReedSolomon};
 
 /// Validates that a received codeword is pristine.
 ///
 /// Returns `true` only if the codeword is entirely uncorrupted; for codewords
 /// longer than 255 bytes, this includes carrying no bytes beyond the full
-/// length recorded in the header. A `true` result implies that [`decode`]
-/// succeeds. The converse does not hold: [`decode`] repairs correctable
+/// length recorded in the header. A `true` result implies that [`decode`](crate::decode)
+/// succeeds. The converse does not hold: [`decode`](crate::decode) repairs correctable
 /// corruption and discards trailing bytes, so it accepts input that this
 /// function rejects.
 #[must_use]
@@ -80,30 +27,6 @@ pub fn validate(received: &[u8], parity: u8) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use crate::EccError;
-
-    use super::{decode, encode};
-
-    #[test]
-    fn ecc_works() -> Result<(), EccError> {
-        let test_str = "Strč prst skrz krk! ¯\\_(ツ)_/¯".as_bytes();
-        let mut encoded = encode(test_str, 13)?;
-
-        for i in 0..13 {
-            let index = (i * 37) % encoded.len();
-
-            encoded[index] ^= (i * index + 13).to_le_bytes()[0];
-            let decoded = decode(&encoded, 13)?;
-
-            assert_eq!(test_str, &decoded[..]);
-        }
-
-        Ok(())
-    }
-}
-
-#[cfg(test)]
-mod validate_tests {
     use crate::{
         long, validate, LongEccDecodeError, LongEccEncodeError, RSEncodeError, ReedSolomon,
     };
