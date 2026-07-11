@@ -5,7 +5,8 @@ impl Polynomial {
     ///
     /// # Panics
     ///
-    /// Panics on polynomials of degree 255, which are invalid in GF(256).
+    /// Panics if the stored degree is 255, which exceeds
+    /// [`Polynomial::MAX_DEGREE`] and cannot occur for a valid polynomial.
     #[must_use]
     pub fn coefficients(&self) -> &[u8] {
         #[allow(clippy::expect_used)]

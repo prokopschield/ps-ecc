@@ -8,7 +8,10 @@ use super::super::generator::generator_poly;
 impl ReedSolomon {
     /// Generates parity bytes.
     /// # Errors
-    /// - [`RSGenerateParityError::Division`] if generator polynomial is zero (shouldn't happen)
+    /// - [`RSGenerateParityError::SetCoefficients`] is returned if
+    ///   `2 * parity + message.len()` exceeds 255.
+    /// - [`RSGenerateParityError::Division`] is returned if the generator
+    ///   polynomial is zero (not expected to occur).
     pub fn generate_parity(&self, message: &[u8]) -> Result<ParityBytes, RSGenerateParityError> {
         let mut p = Polynomial::default();
 

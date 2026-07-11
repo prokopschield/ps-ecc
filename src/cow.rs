@@ -39,9 +39,9 @@ impl Hash for Cow<'_> {
 }
 
 impl Cow<'_> {
-    /// This method turns this [`Cow`] into a [`Buffer`].
-    /// - In the case of [`Cow::Borrowed`], a new [`Buffer`] is allocated.
-    /// - In the case of [`Cow::Owned`], the existing [`Buffer`] is returned.
+    /// Converts this [`Cow`] into a [`SharedBuffer`].
+    /// - In the case of [`Cow::Borrowed`], a new buffer is allocated.
+    /// - In the case of [`Cow::Owned`], the existing buffer is returned.
     /// # Errors
     /// [`BufferError`] is returned if an allocation error occurs.
     pub fn try_into_buffer(self) -> Result<SharedBuffer, BufferError> {

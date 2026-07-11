@@ -28,7 +28,7 @@ fn full_codeword_length(
 /// - [`LongEccEncodeError::InvalidParity`] is returned if `parity` exceeds
 ///   [`MAX_PARITY`].
 /// - [`LongEccEncodeError::InvalidSegmentParityRatio`] is returned if the
-///   parity bytes of a segment would not fit within the segment stride.
+///   parity bytes leave no room for new data within a segment.
 /// - [`std::num::TryFromIntError`] is returned if the encoded codeword
 ///   would exceed [`u32::MAX`] bytes.
 /// - [`ps_buffer::BufferError`] is returned if memory allocation fails.

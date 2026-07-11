@@ -1,9 +1,11 @@
 use crate::{RSConstructorError, ReedSolomon, MAX_PARITY};
 
 impl ReedSolomon {
-    /// Creates a new Reed-Solomon codec with parameters n and k.
+    /// Creates a new Reed-Solomon codec with the given error-correction
+    /// capability.
     /// # Errors
-    /// - `ParityTooHigh` is returned if parity > `MAX_PARITY`
+    /// - [`RSConstructorError::ParityTooHigh`] is returned if `parity`
+    ///   exceeds [`MAX_PARITY`].
     pub const fn new(parity: u8) -> Result<Self, RSConstructorError> {
         use RSConstructorError::ParityTooHigh;
 
