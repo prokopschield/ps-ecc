@@ -1,9 +1,6 @@
 use std::num::NonZero;
 
-use crate::error::GFError;
-
-pub const FIELD_SIZE: usize = 256;
-pub const PRIMITIVE_POLY: u16 = 0x11d; // x^8 + x^4 + x^3 + x^2 + 1
+use super::constants::{FIELD_SIZE, PRIMITIVE_POLY};
 
 /// Log table: `log_table[x] = i` where `x = α^i`
 pub const LOG_TABLE: [u8; FIELD_SIZE] = {
@@ -52,69 +49,9 @@ pub const ANTILOG_TABLE: [NonZero<u8>; FIELD_SIZE] = {
     antilog
 };
 
-/// Addition in GF(256), equivalent to XOR.
-pub const fn add(a: u8, b: u8) -> u8 {
-    a ^ b
-}
-
-/// Subtraction in GF(256), equivalent to XOR.
-pub const fn sub(a: u8, b: u8) -> u8 {
-    a ^ b
-}
-
-/// Multiplication in GF(256) using log tables.
-pub const fn mul(a: u8, b: u8) -> u8 {
-    if a == 0 || b == 0 {
-        return 0;
-    }
-
-    let log_a = LOG_TABLE[a as usize] as u16;
-    let log_b = LOG_TABLE[b as usize] as u16;
-    let sum = (log_a + log_b) % 255;
-
-    ANTILOG_TABLE[sum as usize].get()
-}
-
-/// Multiplicative inverse in GF(256).
-pub const fn inv(a: u8) -> Result<NonZero<u8>, GFError> {
-    use GFError::DivByZero;
-
-    if a == 0 {
-        return Err(DivByZero);
-    }
-
-    let value = ANTILOG_TABLE[(255 - LOG_TABLE[a as usize] as u16) as usize];
-
-    Ok(value)
-}
-
-/// Division in GF(256).
-pub fn div(a: u8, b: u8) -> Result<u8, GFError> {
-    use GFError::DivByZero;
-
-    if b == 0 {
-        return Err(DivByZero);
-    }
-
-    if a == 0 {
-        return Ok(0);
-    }
-
-    Ok(mul(a, inv(b)?.get()))
-}
-
 #[cfg(test)]
 mod tests {
-    use std::num::NonZero;
-
-    use crate::GFError;
-
     use super::ANTILOG_TABLE;
-
-    #[test]
-    fn result_size() {
-        assert_eq!(std::mem::size_of::<Result<NonZero<u8>, GFError>>(), 1);
-    }
 
     #[test]
     fn antilog_nonzero() {
