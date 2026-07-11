@@ -53,7 +53,6 @@ pub fn decode(received: &[u8], parity: u8) -> Result<Codeword<'_>, DecodeError> 
     }
 }
 
-#[must_use]
 /// Validates that a received codeword is pristine.
 ///
 /// Returns `true` only if the codeword is entirely uncorrupted; for codewords
@@ -62,6 +61,7 @@ pub fn decode(received: &[u8], parity: u8) -> Result<Codeword<'_>, DecodeError> 
 /// succeeds. The converse does not hold: [`decode`] repairs correctable
 /// corruption and discards trailing bytes, so it accepts input that this
 /// function rejects.
+#[must_use]
 pub fn validate(received: &[u8], parity: u8) -> bool {
     if let Ok(length) = u8::try_from(received.len()) {
         if parity > length >> 1 {
