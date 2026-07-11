@@ -23,7 +23,9 @@ use crate::{EuclideanError, Polynomial};
 ///
 /// # Errors
 ///
-/// Returns an error if division by zero occurs (indicates invalid input).
+/// Returns an error if division by zero occurs (indicates invalid input),
+/// or if an intermediate product would exceed the maximum polynomial degree
+/// (not expected to occur).
 pub fn euclidean(
     syndromes: &Polynomial,
     t: u8,
@@ -72,7 +74,7 @@ pub fn euclidean(
         r_prev.div_rem_inplace(r_curr, &mut q)?;
 
         // t[prev] <- t[prev] ^ (q * t[curr])
-        t_prev.mul_xor_assign(&q, t_curr);
+        t_prev.mul_xor_assign(&q, t_curr)?;
 
         // Flip index: what was prev becomes curr
         idx ^= 1;

@@ -49,6 +49,8 @@ pub enum PolynomialXorError {
 pub enum EuclideanError {
     #[error(transparent)]
     PolynomialDiv(#[from] PolynomialDivError),
+    #[error(transparent)]
+    PolynomialMul(#[from] PolynomialMulError),
 }
 
 #[derive(Error, Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]

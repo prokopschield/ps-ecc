@@ -1,4 +1,4 @@
-use crate::{finite_field::mul, Polynomial};
+use crate::{finite_field::mul, Polynomial, PolynomialMulError};
 
 impl Polynomial {
     /// Fused multiply-XOR: `self ^= a * b`
@@ -8,17 +8,25 @@ impl Polynomial {
     ///
     /// In GF(2^8), XOR is equivalent to both addition and subtraction, so this
     /// computes `self = self + a * b` or equivalently `self = self - a * b`.
+    /// # Errors
+    /// Returns [`PolynomialMulError::DegreeOverflow`] if the product degree,
+    /// `a.degree() + b.degree()`, exceeds [`Polynomial::MAX_DEGREE`].
+    /// `self` is unmodified on error.
     #[inline]
-    pub fn mul_xor_assign(&mut self, a: &Self, b: &Self) {
+    pub fn mul_xor_assign(&mut self, a: &Self, b: &Self) -> Result<(), PolynomialMulError> {
         let a_deg = a.degree as usize;
         let b_deg = b.degree as usize;
 
         // Early exit if either operand is zero polynomial
         if a.coefficients[a_deg] == 0 || b.coefficients[b_deg] == 0 {
-            return;
+            return Ok(());
         }
 
         let product_deg = a_deg + b_deg;
+
+        if product_deg > usize::from(Self::MAX_DEGREE) {
+            return Err(PolynomialMulError::DegreeOverflow);
+        }
 
         // Accumulate a * b into self via XOR
         for i in 0..=a_deg {
@@ -40,19 +48,54 @@ impl Polynomial {
         }
 
         // Update degree: max of original self degree and product degree
-        #[allow(clippy::cast_possible_truncation)]
+        #[allow(clippy::cast_possible_truncation)] // product_deg <= MAX_DEGREE
         if product_deg > self.degree as usize {
             self.degree = product_deg as u8;
         }
 
         self.trim_degree();
+
+        Ok(())
     }
 }
 
 #[cfg(test)]
 #[allow(clippy::expect_used)]
 mod tests {
-    use crate::Polynomial;
+    use crate::{Polynomial, PolynomialMulError};
+
+    #[test]
+    fn mul_xor_assign_max_product_degree() {
+        // 127 + 127 = 254 = MAX_DEGREE, the largest representable product.
+        let mut dest = Polynomial::default();
+        let mut a = Polynomial::default();
+        let mut b = Polynomial::default();
+
+        a.set(127, 1);
+        b.set(127, 1);
+
+        dest.mul_xor_assign(&a, &b).expect("product degree fits");
+
+        assert_eq!(dest.degree(), 254);
+    }
+
+    #[test]
+    fn mul_xor_assign_rejects_degree_overflow() {
+        // 128 + 127 = 255 > MAX_DEGREE; previously wrote past the
+        // 255-element coefficient array.
+        let mut dest = Polynomial::try_from(&[7u8][..]).expect("valid polynomial");
+        let mut a = Polynomial::default();
+        let mut b = Polynomial::default();
+
+        a.set(128, 1);
+        b.set(127, 1);
+
+        let original = dest;
+        let result = dest.mul_xor_assign(&a, &b);
+
+        assert_eq!(result, Err(PolynomialMulError::DegreeOverflow));
+        assert_eq!(dest, original);
+    }
 
     #[test]
     fn mul_xor_assign_basic() {
@@ -63,7 +106,7 @@ mod tests {
         let a = Polynomial::try_from(&[1u8, 1][..]).expect("valid polynomial");
         let b = Polynomial::try_from(&[1u8, 1][..]).expect("valid polynomial");
 
-        dest.mul_xor_assign(&a, &b);
+        dest.mul_xor_assign(&a, &b).expect("product degree fits");
 
         assert_eq!(dest.coefficients(), &[0, 0, 1]);
     }
@@ -74,7 +117,7 @@ mod tests {
         let a = Polynomial::default(); // zero polynomial
         let b = Polynomial::try_from(&[1u8, 2, 3][..]).expect("valid polynomial");
 
-        dest.mul_xor_assign(&a, &b);
+        dest.mul_xor_assign(&a, &b).expect("product degree fits");
 
         // dest unchanged since a is zero
         assert_eq!(dest.coefficients(), &[5, 3]);
@@ -86,7 +129,7 @@ mod tests {
         let a = Polynomial::try_from(&[1u8, 2, 3][..]).expect("valid polynomial");
         let b = Polynomial::default(); // zero polynomial
 
-        dest.mul_xor_assign(&a, &b);
+        dest.mul_xor_assign(&a, &b).expect("product degree fits");
 
         // dest unchanged since b is zero
         assert_eq!(dest.coefficients(), &[5, 3]);
@@ -101,7 +144,7 @@ mod tests {
 
         // a * b = [1, 0, 1]
         // dest ^= [1, 0, 1] => [0, 0, 0] = 0
-        dest.mul_xor_assign(&a, &b);
+        dest.mul_xor_assign(&a, &b).expect("product degree fits");
 
         assert_eq!(dest.coefficients(), &[0]);
     }
@@ -115,7 +158,7 @@ mod tests {
 
         // a * b = x^3 + x^2 + x + 1 = [1, 1, 1, 1]
         // dest ^= [1, 1, 1, 1] => [5^1, 1, 1, 1] = [4, 1, 1, 1]
-        dest.mul_xor_assign(&a, &b);
+        dest.mul_xor_assign(&a, &b).expect("product degree fits");
 
         assert_eq!(dest.coefficients(), &[4, 1, 1, 1]);
     }
