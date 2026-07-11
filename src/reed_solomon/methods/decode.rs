@@ -3,13 +3,29 @@ use crate::{Codeword, RSDecodeError, ReedSolomon};
 impl ReedSolomon {
     /// Decodes a received codeword, correcting errors if possible.
     /// # Errors
+    /// - [`RSDecodeError::InsufficientLength`] is returned if `received` holds
+    ///   fewer bytes than [`ReedSolomon::parity_bytes`].
+    /// - [`std::num::TryFromIntError`] is returned if `received` holds more
+    ///   than 255 bytes.
     /// - [`ps_buffer::BufferError`] is returned if memory allocation fails.
-    /// - [`RSDecodeError`] is propagated from [`ReedSolomon::compute_errors`].
+    /// - [`RSComputeErrorsError`](crate::RSComputeErrorsError) is propagated
+    ///   from [`ReedSolomon::compute_errors`].
+    /// - [`RSDecodeError::TooManyErrors`] is returned if the corrected bytes
+    ///   fail validation.
     pub fn decode<'lt>(&self, received: &'lt [u8]) -> Result<Codeword<'lt>, RSDecodeError> {
+        let parity_bytes = self.parity_bytes();
+
+        if received.len() < usize::from(parity_bytes) {
+            return Err(RSDecodeError::InsufficientLength {
+                parity_bytes,
+                received: received.len(),
+            });
+        }
+
         let corrected = self.correct(received)?;
         let codeword = Codeword {
             codeword: corrected,
-            range: self.parity_bytes().into()..received.len(),
+            range: usize::from(parity_bytes)..received.len(),
         };
 
         Ok(codeword)
@@ -179,6 +195,62 @@ mod tests {
         let decoded = rs.decode(&corrupted)?;
 
         assert_eq!(&decoded[..], &message[..]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_decode_empty_input_rejected() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(4)?;
+
+        // Without the length guard, decode returns Ok with the inverted
+        // range 8..0, and the first deref panics.
+        assert_eq!(
+            rs.decode(&[]),
+            Err(RSDecodeError::InsufficientLength {
+                parity_bytes: 8,
+                received: 0,
+            })
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_decode_input_shorter_than_parity_rejected() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(4)?;
+
+        assert_eq!(
+            rs.decode(&[0u8; 7]),
+            Err(RSDecodeError::InsufficientLength {
+                parity_bytes: 8,
+                received: 7,
+            })
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_decode_parity_only_codeword() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(4)?;
+        let encoded = rs.encode(&[])?;
+
+        assert_eq!(encoded.len(), usize::from(rs.parity_bytes()));
+
+        let decoded = rs.decode(&encoded)?;
+
+        assert!(decoded.is_empty());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_decode_zero_parity_empty_input() -> Result<(), TestError> {
+        let rs = ReedSolomon::new(0)?;
+        let decoded = rs.decode(&[])?;
+
+        assert!(decoded.is_empty());
 
         Ok(())
     }

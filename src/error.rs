@@ -89,6 +89,8 @@ pub enum RSComputeErrorsError {
 pub enum RSDecodeError {
     #[error(transparent)]
     BufferError(#[from] BufferError),
+    #[error("Input length {received} is less than the parity length {parity_bytes}.")]
+    InsufficientLength { parity_bytes: u8, received: usize },
     #[error(transparent)]
     RSComputeErrorsError(#[from] RSComputeErrorsError),
     #[error(transparent)]
