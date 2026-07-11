@@ -6,14 +6,20 @@ use super::{LongEccHeader, HEADER_SIZE};
 
 /// Corrects errors in-place in a codeword.
 pub fn correct_in_place(codeword: &mut [u8]) -> Result<LongEccHeader, LongEccDecodeError> {
-    use LongEccDecodeError::{
-        IntegrityCheckFailed, InvalidCodeword, ReadDataError, ReadParityError,
-    };
-
     // Fast path - skip correction if data is valid
     if let Ok(Some(header)) = fast_validate(codeword) {
         return Ok(header);
     }
+
+    correct_in_place_slow_path(codeword)
+}
+
+pub(crate) fn correct_in_place_slow_path(
+    codeword: &mut [u8],
+) -> Result<LongEccHeader, LongEccDecodeError> {
+    use LongEccDecodeError::{
+        IntegrityCheckFailed, InvalidCodeword, ReadDataError, ReadParityError,
+    };
 
     // Parse and correct header
     let header = LongEccHeader::from_byte_slice(codeword)?;
