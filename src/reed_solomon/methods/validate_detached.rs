@@ -5,7 +5,7 @@ impl ReedSolomon {
     ///
     /// Returns `Ok(None)` if valid, or `Ok(Some(syndromes))` if errors are
     /// detected. An empty `parity` slice carries no parity information, so
-    /// the pair validates trivially.
+    /// a pair within the length bound validates trivially.
     ///
     /// A pair whose combined length exceeds
     /// [`Polynomial::MAX_COEFFICIENTS`] (255) bytes can never be a valid
