@@ -1,4 +1,4 @@
-use crate::LongEccDecodeError;
+use crate::LongEccFastValidateError;
 
 use super::checksums::xxh64;
 use super::{LongEccHeader, HEADER_SIZE};
@@ -9,38 +9,36 @@ use super::{LongEccHeader, HEADER_SIZE};
 /// so corruption anywhere after the header is detected. A buffer whose length
 /// differs from the header's full length is not a pristine codeword.
 ///
-/// Returns the parsed header for a pristine codeword, `Ok(None)` for a
-/// corrupted payload or a buffer too short to hold a header, and an error
-/// if a full-sized header fails to parse.
+/// Returns the parsed header together with a flag that is `true` only for a
+/// pristine codeword: one whose stored header bytes needed no correction,
+/// whose length matches the header's full length, and whose payload matches
+/// the header's checksum.
 ///
 /// # Errors
-/// Returns an error if a full-sized header fails to parse, or if the header's
-/// full length does not fit in `usize`.
-pub fn fast_validate(codeword: &[u8]) -> Result<Option<LongEccHeader>, LongEccDecodeError> {
-    if codeword.len() < HEADER_SIZE {
-        return Ok(None);
-    }
-
+/// Returns an error if the header fails to parse, including when the buffer
+/// is too short to hold a header, or if the header's full length does not
+/// fit in `usize`.
+pub fn fast_validate(codeword: &[u8]) -> Result<(LongEccHeader, bool), LongEccFastValidateError> {
     let header = LongEccHeader::from_byte_slice(codeword)?;
 
     // A header that required correction means the codeword is not pristine.
     if codeword[..HEADER_SIZE] != header.to_bytes() {
-        return Ok(None);
+        return Ok((header, false));
     }
 
     let full_length = usize::try_from(header.full_length())?;
 
     // Reject truncated codewords and codewords carrying trailing bytes.
     if codeword.len() != full_length {
-        return Ok(None);
+        return Ok((header, false));
     }
 
     let Some(payload) = codeword.get(HEADER_SIZE..full_length) else {
-        return Ok(None);
+        return Ok((header, false));
     };
 
     // Validate XXH64 of the message and parity
-    Ok((xxh64(payload) == header.checksum()).then_some(header))
+    Ok((header, xxh64(payload) == header.checksum()))
 }
 
 #[cfg(test)]
@@ -58,7 +56,7 @@ mod tests {
 
         let encoded = encode(&message, 2, OverlapFactor::Simple)?;
 
-        assert!(fast_validate(&encoded)?.is_some());
+        assert!(fast_validate(&encoded)?.1);
 
         Ok(())
     }
@@ -73,7 +71,7 @@ mod tests {
 
         extended.push(0xAB);
 
-        assert!(fast_validate(&extended)?.is_none());
+        assert!(!fast_validate(&extended)?.1);
 
         Ok(())
     }

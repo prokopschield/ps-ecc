@@ -337,3 +337,11 @@ pub enum LongEccDecodeError {
     #[error(transparent)]
     TryFromIntError(#[from] TryFromIntError),
 }
+
+#[derive(Debug, thiserror::Error, Clone, PartialEq, Eq)]
+pub enum LongEccFastValidateError {
+    #[error("Header parsing failed: {0}")]
+    HeaderParse(#[from] crate::LongEccHeaderFromByteSliceError),
+    #[error("Integer conversion error: {0}")]
+    IntegerConversion(#[from] std::num::TryFromIntError),
+}

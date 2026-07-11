@@ -7,7 +7,7 @@ use super::{LongEccHeader, HEADER_SIZE};
 /// Corrects errors in-place in a codeword.
 pub fn correct_in_place(codeword: &mut [u8]) -> Result<LongEccHeader, LongEccDecodeError> {
     // Fast path - skip correction if data is valid
-    if let Ok(Some(header)) = fast_validate(codeword) {
+    if let Ok((header, true)) = fast_validate(codeword) {
         return Ok(header);
     }
 

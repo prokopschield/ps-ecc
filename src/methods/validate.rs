@@ -22,7 +22,7 @@ pub fn validate(received: &[u8], parity: u8) -> bool {
 
         rs.validate(received).is_none()
     } else {
-        matches!(long::fast_validate(received), Ok(Some(_)))
+        matches!(long::fast_validate(received), Ok((_, true)))
     }
 }
 
