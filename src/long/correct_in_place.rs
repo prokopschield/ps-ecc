@@ -1,22 +1,10 @@
 use crate::{LongEccDecodeError, ReedSolomon};
 
 use super::checksums::xxh64;
-use super::fast_validate::fast_validate;
 use super::{LongEccHeader, HEADER_SIZE};
 
 /// Corrects errors in-place in a codeword.
 pub fn correct_in_place(codeword: &mut [u8]) -> Result<LongEccHeader, LongEccDecodeError> {
-    // Fast path - skip correction if data is valid
-    if let Ok((header, true)) = fast_validate(codeword) {
-        return Ok(header);
-    }
-
-    correct_in_place_slow_path(codeword)
-}
-
-pub(crate) fn correct_in_place_slow_path(
-    codeword: &mut [u8],
-) -> Result<LongEccHeader, LongEccDecodeError> {
     use LongEccDecodeError::{
         IntegrityCheckFailed, InvalidCodeword, ReadDataError, ReadParityError,
     };

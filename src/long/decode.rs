@@ -2,7 +2,7 @@ use ps_buffer::Buffer;
 
 use crate::{Codeword, LongEccDecodeError};
 
-use super::correct_in_place::correct_in_place_slow_path;
+use super::correct_in_place::correct_in_place;
 use super::fast_validate;
 use super::HEADER_SIZE;
 
@@ -25,7 +25,7 @@ pub fn decode(codeword: &[u8]) -> Result<Codeword<'_>, LongEccDecodeError> {
     let mut buffer = Buffer::with_capacity(buffer_cap)?;
 
     buffer.extend_from_slice(&codeword[..codeword_bytes_to_copy])?;
-    correct_in_place_slow_path(&mut buffer)?;
+    correct_in_place(&mut buffer)?;
 
     let codeword = Codeword {
         codeword: buffer.into(),
