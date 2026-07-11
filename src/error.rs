@@ -18,8 +18,11 @@ pub enum GFError {
 #[derive(Error, Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum PolynomialFromSliceError {
     /// The slice holds more coefficients than a polynomial can store.
-    #[error("Slice was {size} bytes, max 255 allowed in GF(256).")]
-    TooLong { size: usize },
+    #[error("Slice was {size} bytes; a polynomial over GF(256) holds at most 255 coefficients.")]
+    TooLong {
+        /// Length of the offending slice.
+        size: usize,
+    },
 }
 
 /// Errors returned by
@@ -28,7 +31,12 @@ pub enum PolynomialFromSliceError {
 pub enum PolynomialSetCoefficientsError {
     /// The coefficient range extends past the maximum coefficient index.
     #[error("Range {offset}..{end} exceeds maximum coefficient index 254.")]
-    OutOfBounds { offset: u8, end: usize },
+    OutOfBounds {
+        /// First coefficient index of the range.
+        offset: u8,
+        /// One past the last coefficient index of the range.
+        end: usize,
+    },
 }
 
 /// Errors of polynomial multiplication.
@@ -65,7 +73,10 @@ pub enum EuclideanError {
     /// The error-correction capability `t` requires the polynomial `x^(2t)`,
     /// whose degree exceeds [`Polynomial::MAX_DEGREE`](crate::Polynomial::MAX_DEGREE).
     #[error("Error-correction capability {t} exceeds the maximum of 127.")]
-    CapabilityTooHigh { t: u8 },
+    CapabilityTooHigh {
+        /// The rejected error-correction capability.
+        t: u8,
+    },
     /// Propagated from polynomial division.
     #[error(transparent)]
     PolynomialDiv(#[from] PolynomialDivError),
@@ -140,7 +151,12 @@ pub enum RSDecodeError {
     /// The input holds fewer bytes than the parity, so it cannot be a
     /// codeword.
     #[error("Input length {received} is less than the parity length {parity_bytes}.")]
-    InsufficientLength { parity_bytes: u8, received: usize },
+    InsufficientLength {
+        /// Number of parity bytes the codec expects.
+        parity_bytes: u8,
+        /// Number of bytes actually received.
+        received: usize,
+    },
     /// Propagated from error computation.
     #[error(transparent)]
     RSComputeErrorsError(#[from] RSComputeErrorsError),

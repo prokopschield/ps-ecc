@@ -7,7 +7,7 @@ use super::mul_coefficient_slices;
 impl Mul<&[u8]> for &Polynomial {
     type Output = Result<Polynomial, PolynomialMulError>;
 
-    /// Multiplies a polynomial by a coefficient slice in GF(256).
+    /// Multiplies a polynomial by a coefficient slice over GF(256).
     ///
     /// # Errors
     ///

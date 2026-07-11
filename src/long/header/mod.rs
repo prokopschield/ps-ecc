@@ -8,6 +8,11 @@ use codec::RS;
 pub use magic::LONG_ECC_HEADER_MAGIC;
 pub use overlap_factor::OverlapFactor;
 
+/// The 32-byte header of a long ECC codeword.
+///
+/// Records the codec geometry (error-correction capability, overlap
+/// factor, and lengths) and the payload checksum, and is itself protected
+/// by a dedicated checksum and parity bytes.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 #[allow(clippy::module_name_repetitions)]
 #[repr(C, align(16))]

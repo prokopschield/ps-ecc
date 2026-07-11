@@ -5,7 +5,7 @@ use crate::{error::PolynomialDivError, Polynomial};
 impl<D: AsRef<[u8]>> Rem<D> for &Polynomial {
     type Output = Result<Polynomial, PolynomialDivError>;
 
-    /// Computes the remainder of polynomial division in GF(256).
+    /// Computes the remainder of polynomial division over GF(256).
     ///
     /// # Errors
     ///

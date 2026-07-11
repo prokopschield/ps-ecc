@@ -6,7 +6,7 @@ impl ParityBytes {
     /// Creates parity bytes from a polynomial remainder and parity count.
     ///
     /// Extracts the first `parity * 2` coefficients from `remainder`.
-    /// The `parity` parameter is the error correction capability of the codec
+    /// The `parity` parameter is the error-correction capability of the codec
     /// and must not exceed [`MAX_PARITY`]; the sole caller,
     /// [`ReedSolomon::generate_parity`](crate::ReedSolomon::generate_parity),
     /// passes a parity count already validated by

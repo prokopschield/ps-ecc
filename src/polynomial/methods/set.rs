@@ -11,7 +11,7 @@ impl Polynomial {
     ///
     /// # Panics
     ///
-    /// Panics if `idx` exceeds 254, the maximum degree of a polynomial in GF(256).
+    /// Panics if `idx` exceeds 254, the maximum degree of a polynomial over GF(256).
     pub fn set(&mut self, idx: u8, value: u8) {
         self.coefficients[idx as usize] = value;
 

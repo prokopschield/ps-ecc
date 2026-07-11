@@ -4,7 +4,8 @@ use crate::{long, ReedSolomon};
 ///
 /// Returns `true` only if the codeword is entirely uncorrupted; for codewords
 /// longer than 255 bytes, this includes carrying no bytes beyond the full
-/// length recorded in the header. A `true` result implies that [`decode`](crate::decode)
+/// length recorded in the header, and the `parity` argument is ignored,
+/// since the header records the parity. A `true` result implies that [`decode`](crate::decode)
 /// succeeds. The converse does not hold: [`decode`](crate::decode) repairs correctable
 /// corruption and discards trailing bytes, so it accepts input that this
 /// function rejects.

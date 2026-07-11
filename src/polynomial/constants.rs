@@ -6,7 +6,7 @@ pub const POLYNOMIAL_MAX_DEGREE_U8: u8 = POLYNOMIAL_MAX_COEFFICIENTS_U8 - 1;
 pub const POLYNOMIAL_MAX_COEFFICIENTS: usize = POLYNOMIAL_MAX_COEFFICIENTS_U8 as usize;
 
 impl Polynomial {
-    /// Maximum degree of a polynomial in GF(256).
+    /// Maximum degree of a polynomial over GF(256).
     pub const MAX_DEGREE: u8 = POLYNOMIAL_MAX_DEGREE_U8;
 
     /// Maximum number of coefficients in a polynomial.

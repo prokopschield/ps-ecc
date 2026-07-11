@@ -77,7 +77,7 @@ const fn compute_generator_data() -> [u8; TOTAL_COEFFS] {
     data
 }
 
-/// Returns the generator polynomial for the given parity (error correction capability).
+/// Returns the generator polynomial for the given parity (error-correction capability).
 ///
 /// # Panics
 ///

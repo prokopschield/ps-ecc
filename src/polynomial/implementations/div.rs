@@ -5,7 +5,7 @@ use crate::{error::PolynomialDivError, Polynomial};
 impl<D: AsRef<[u8]>> Div<D> for &Polynomial {
     type Output = Result<Polynomial, PolynomialDivError>;
 
-    /// Divides two polynomials in GF(256), returning the quotient.
+    /// Divides two polynomials over GF(256), returning the quotient.
     ///
     /// # Errors
     ///
