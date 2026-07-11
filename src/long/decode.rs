@@ -3,10 +3,20 @@ use ps_buffer::Buffer;
 use crate::{Codeword, LongEccDecodeError};
 
 use super::correct_in_place::correct_in_place;
+use super::fast_validate;
 use super::HEADER_SIZE;
 
 /// Decodes a codeword to extract the original message.
 pub fn decode(codeword: &[u8]) -> Result<Codeword<'_>, LongEccDecodeError> {
+    let (header, is_ok) = fast_validate(codeword)?;
+
+    if is_ok {
+        return Ok(Codeword {
+            codeword: codeword.into(),
+            range: HEADER_SIZE..HEADER_SIZE + usize::try_from(header.message_length())?,
+        });
+    }
+
     let mut buffer = Buffer::from_slice(codeword)?;
     let header = correct_in_place(&mut buffer)?;
 

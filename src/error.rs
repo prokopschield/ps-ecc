@@ -315,6 +315,9 @@ pub enum LongEccDecodeError {
     /// Propagated from buffer allocation.
     #[error(transparent)]
     BufferError(#[from] BufferError),
+    /// Fast validation failed
+    #[error("Fast validation failed: {0}")]
+    FastValidate(#[from] LongEccFastValidateError),
     /// The checksum still mismatches after error correction.
     #[error("Integrity check failed after correction.")]
     IntegrityCheckFailed,
