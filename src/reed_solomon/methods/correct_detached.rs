@@ -8,7 +8,7 @@ impl ReedSolomon {
     /// # Errors
     /// - [`RSConstructorError`](crate::RSConstructorError) is returned if
     ///   `parity` holds more than [`MAX_PARITY_BYTES`](crate::MAX_PARITY_BYTES)
-    ///   bytes.
+    ///   bytes, or an odd number of bytes.
     /// - [`std::num::TryFromIntError`] is returned if `parity` and `data`
     ///   together hold more than 255 bytes.
     /// - [`ps_buffer::BufferError`] is returned if memory allocation fails.
@@ -121,6 +121,20 @@ mod tests {
             ReedSolomon::correct_detached(&parity, &[]),
             Err(RSDecodeError::RSConstructorError(
                 RSConstructorError::ParityTooHigh
+            ))
+        );
+    }
+
+    #[test]
+    fn test_correct_detached_rejects_odd_parity_length() {
+        // An odd length previously dropped the last parity byte from
+        // num_parity while the syndromes covered the full slice.
+        let parity = [0u8; 5];
+
+        assert_eq!(
+            ReedSolomon::correct_detached(&parity, b"data"),
+            Err(RSDecodeError::RSConstructorError(
+                RSConstructorError::OddParityLength(5)
             ))
         );
     }

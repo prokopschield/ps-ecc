@@ -3,15 +3,25 @@ use crate::{Polynomial, RSConstructorError, ReedSolomon, MAX_PARITY_BYTES};
 
 impl ReedSolomon {
     /// Computes the syndromes of a given detached codeword.
+    ///
+    /// An empty `parity` slice yields zero syndromes, so a pair carrying no
+    /// parity always validates as pristine.
     /// # Errors
     /// - [`RSConstructorError::ParityTooHigh`] is returned if `parity` holds
     ///   more than [`MAX_PARITY_BYTES`] bytes.
+    /// - [`RSConstructorError::OddParityLength`] is returned if `parity`
+    ///   holds an odd number of bytes; parity is always generated in
+    ///   two-byte symbols.
     pub fn compute_syndromes_detached(
         parity: &[u8],
         data: &[u8],
     ) -> Result<Polynomial, RSConstructorError> {
         if parity.len() > usize::from(MAX_PARITY_BYTES) {
             return Err(RSConstructorError::ParityTooHigh);
+        }
+
+        if !parity.len().is_multiple_of(2) {
+            return Err(RSConstructorError::OddParityLength(parity.len()));
         }
 
         let syndromes = (0..parity.len())
@@ -84,6 +94,32 @@ mod tests {
         assert!(syndromes.is_zero());
 
         Ok(())
+    }
+
+    #[test]
+    fn test_compute_syndromes_detached_rejects_odd_parity_length() {
+        // num_parity = parity.len() >> 1 silently dropped the odd byte
+        // while the syndromes covered the full slice; odd lengths are now
+        // rejected because generate_parity only produces two-byte symbols.
+        for parity_len in [1usize, 3, 125] {
+            let parity = vec![0u8; parity_len];
+
+            assert_eq!(
+                ReedSolomon::compute_syndromes_detached(&parity, &[]),
+                Err(RSConstructorError::OddParityLength(parity_len))
+            );
+        }
+    }
+
+    #[test]
+    fn test_compute_syndromes_detached_oversized_wins_over_odd() {
+        // 127 is both oversized and odd; the length bound is checked first.
+        let parity = [0u8; 127];
+
+        assert_eq!(
+            ReedSolomon::compute_syndromes_detached(&parity, &[]),
+            Err(RSConstructorError::ParityTooHigh)
+        );
     }
 
     #[test]

@@ -5,7 +5,7 @@ impl ReedSolomon {
     /// Also corrects the parity bytes.
     /// # Errors
     /// - [`RSConstructorError`] is returned if `parity` holds more than
-    ///   [`MAX_PARITY_BYTES`] bytes.
+    ///   [`MAX_PARITY_BYTES`] bytes, or an odd number of bytes.
     /// - [`std::num::TryFromIntError`] is returned if `parity` and `data`
     ///   together hold more than 255 bytes.
     /// - [`RSComputeErrorsError`](crate::RSComputeErrorsError) is propagated

@@ -4,10 +4,13 @@ impl ReedSolomon {
     /// Validates a segregated (parity, data) pair.
     ///
     /// Returns `Ok(None)` if valid, or `Ok(Some(syndromes))` if errors are
-    /// detected.
+    /// detected. An empty `parity` slice carries no parity information, so
+    /// the pair validates trivially.
     /// # Errors
     /// - [`RSConstructorError::ParityTooHigh`] is returned if `parity` holds
     ///   more than [`MAX_PARITY_BYTES`](crate::MAX_PARITY_BYTES) bytes.
+    /// - [`RSConstructorError::OddParityLength`] is returned if `parity`
+    ///   holds an odd number of bytes.
     pub fn validate_detached(
         parity: &[u8],
         data: &[u8],
@@ -70,6 +73,23 @@ mod tests {
         corrupted[1] ^= 8;
 
         assert!(ReedSolomon::validate_detached(&parity, &corrupted)?.is_some());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_validate_detached_rejects_odd_parity_length() {
+        let parity = [0u8; 3];
+
+        assert_eq!(
+            ReedSolomon::validate_detached(&parity, &[]),
+            Err(RSConstructorError::OddParityLength(3))
+        );
+    }
+
+    #[test]
+    fn test_validate_detached_empty_parity_is_trivially_valid() -> Result<(), TestError> {
+        assert!(ReedSolomon::validate_detached(&[], b"anything")?.is_none());
 
         Ok(())
     }

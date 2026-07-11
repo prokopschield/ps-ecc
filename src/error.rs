@@ -59,6 +59,10 @@ pub enum EuclideanError {
 
 #[derive(Error, Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum RSConstructorError {
+    /// A detached parity slice holds an odd number of bytes; parity is
+    /// always generated in two-byte symbols.
+    #[error("Parity byte count {0} is odd; each parity symbol spans two bytes.")]
+    OddParityLength(usize),
     #[error("Parity count must be <= 63.")]
     ParityTooHigh,
 }
