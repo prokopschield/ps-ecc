@@ -6,6 +6,12 @@ impl ReedSolomon {
     /// Returns `Ok(None)` if valid, or `Ok(Some(syndromes))` if errors are
     /// detected. An empty `parity` slice carries no parity information, so
     /// the pair validates trivially.
+    ///
+    /// A pair whose combined length exceeds
+    /// [`Polynomial::MAX_COEFFICIENTS`] (255) bytes can never be a valid
+    /// codeword and always yields `Ok(Some)`; for such inputs the contained
+    /// syndrome polynomial may be zero and is not usable for error
+    /// computation.
     /// # Errors
     /// - [`RSConstructorError::ParityTooHigh`] is returned if `parity` holds
     ///   more than [`MAX_PARITY_BYTES`](crate::MAX_PARITY_BYTES) bytes.
@@ -17,7 +23,10 @@ impl ReedSolomon {
     ) -> Result<Option<Polynomial>, RSConstructorError> {
         let syndromes = Self::compute_syndromes_detached(parity, data)?;
 
-        if syndromes.is_zero() {
+        let length_is_valid =
+            parity.len() + data.len() <= usize::from(Polynomial::MAX_COEFFICIENTS);
+
+        if length_is_valid && syndromes.is_zero() {
             Ok(None)
         } else {
             Ok(Some(syndromes))
@@ -90,6 +99,24 @@ mod tests {
     #[test]
     fn test_validate_detached_empty_parity_is_trivially_valid() -> Result<(), TestError> {
         assert!(ReedSolomon::validate_detached(&[], b"anything")?.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_validate_detached_rejects_oversized_combined_length() -> Result<(), TestError> {
+        // 4 parity bytes plus 252 data bytes exceed the 255-byte codeword;
+        // without the upper bound the all-zero pair validated as pristine,
+        // although correct_detached rejects the identical input.
+        assert!(ReedSolomon::validate_detached(&[0u8; 4], &[0u8; 252])?.is_some());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_validate_detached_accepts_maximum_combined_length() -> Result<(), TestError> {
+        // 4 parity bytes plus 251 data bytes fill the codeword exactly.
+        assert!(ReedSolomon::validate_detached(&[0u8; 4], &[0u8; 251])?.is_none());
 
         Ok(())
     }

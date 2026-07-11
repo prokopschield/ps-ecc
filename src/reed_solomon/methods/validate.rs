@@ -6,16 +6,20 @@ impl ReedSolomon {
     /// Returns `None` if `received` is a valid codeword, or `Some(syndromes)`
     /// if errors are detected.
     ///
-    /// An input holding fewer bytes than [`ReedSolomon::parity_bytes`] can
-    /// never be a valid codeword and always yields `Some`; for such inputs
-    /// the contained syndrome polynomial may be zero and is not usable for
+    /// An input holding fewer bytes than [`ReedSolomon::parity_bytes`], or
+    /// more than [`Polynomial::MAX_COEFFICIENTS`] (255) bytes, can never be
+    /// a valid codeword and always yields `Some`; for such inputs the
+    /// contained syndrome polynomial may be zero and is not usable for
     /// error computation.
     #[must_use]
     pub fn validate(&self, received: &[u8]) -> Option<Polynomial> {
         let parity_bytes = self.parity_bytes();
         let syndromes = Self::compute_syndromes(parity_bytes, received);
 
-        if received.len() >= usize::from(parity_bytes) && syndromes.is_zero() {
+        let length_is_valid = received.len() >= usize::from(parity_bytes)
+            && received.len() <= usize::from(Polynomial::MAX_COEFFICIENTS);
+
+        if length_is_valid && syndromes.is_zero() {
             None
         } else {
             Some(syndromes)
@@ -84,6 +88,29 @@ mod tests {
 
         assert!(rs.validate(&[]).is_some());
         assert!(rs.validate(&[0u8; 7]).is_some());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_validate_rejects_input_longer_than_max_codeword() -> Result<(), TestError> {
+        // A valid codeword zero-padded past 255 bytes yields the same zero
+        // syndromes; without the upper bound it validated as pristine,
+        // although decode rejects the identical bytes.
+        let rs = ReedSolomon::new(4)?;
+
+        assert!(rs.validate(&[0u8; 256]).is_some());
+        assert!(rs.validate(&[0u8; 300]).is_some());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_validate_accepts_maximum_length_codeword() -> Result<(), TestError> {
+        // 255 zero bytes form the codeword of the all-zero 247-byte message.
+        let rs = ReedSolomon::new(4)?;
+
+        assert!(rs.validate(&[0u8; 255]).is_none());
 
         Ok(())
     }
