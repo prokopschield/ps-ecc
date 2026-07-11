@@ -1,3 +1,4 @@
+use std::num::TryFromIntError;
 use std::ops::Add;
 
 use ps_buffer::Buffer;
@@ -6,6 +7,21 @@ use crate::{LongEccEncodeError, ReedSolomon, MAX_PARITY};
 
 use super::checksums::xxh64;
 use super::{LongEccHeader, OverlapFactor, HEADER_SIZE};
+
+/// Computes the full codeword length: header, message, and per-segment
+/// parity. The u128 arithmetic cannot overflow, unlike usize on 32-bit
+/// targets, and the result is bounded by the u32 the header stores.
+fn full_codeword_length(
+    base_len: usize,
+    parity_bytes_per_segment: usize,
+    segment_count: usize,
+) -> Result<u32, TryFromIntError> {
+    let length = u128::try_from(HEADER_SIZE)?
+        + u128::try_from(base_len)?
+        + u128::try_from(parity_bytes_per_segment)? * u128::try_from(segment_count)?;
+
+    u32::try_from(length)
+}
 
 /// Encodes a message with long ECC protection.
 /// # Errors
@@ -57,14 +73,9 @@ pub fn encode(
         .div_ceil(new_bytes_per_segment)
         .saturating_add(1);
 
-    // Calculate the total size. The header stores it as u32; checking the
-    // bound here fails an oversized encode before allocation and parity
-    // generation. The u128 arithmetic cannot overflow, unlike usize on
-    // 32-bit targets.
-    let full_length_u128 = u128::try_from(HEADER_SIZE)?
-        + u128::try_from(base_len)?
-        + u128::try_from(parity_bytes_per_segment)? * u128::try_from(segment_count)?;
-    let full_length_u32 = u32::try_from(full_length_u128)?;
+    // The header stores the total length as u32; checking the bound here
+    // fails an oversized encode before allocation and parity generation.
+    let full_length_u32 = full_codeword_length(base_len, parity_bytes_per_segment, segment_count)?;
     let full_length = usize::try_from(full_length_u32)?;
 
     // Initialize the output buffer, reserving zeroed space for the header;
@@ -146,6 +157,31 @@ mod tests {
     };
 
     type TestError = Box<dyn std::error::Error>;
+
+    #[test]
+    fn full_codeword_length_accepts_exactly_u32_max() -> Result<(), TestError> {
+        let base_len = usize::try_from(u32::MAX)? - HEADER_SIZE;
+
+        assert_eq!(super::full_codeword_length(base_len, 0, 0), Ok(u32::MAX));
+
+        Ok(())
+    }
+
+    #[test]
+    fn full_codeword_length_rejects_above_u32_max() -> Result<(), TestError> {
+        let base_len = usize::try_from(u32::MAX)? - HEADER_SIZE;
+
+        assert!(super::full_codeword_length(base_len, 1, 1).is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn full_codeword_length_is_exact_for_huge_products() {
+        // A huge segment count would wrap any usize arithmetic; the u128
+        // computation reports the overflow instead of wrapping.
+        assert!(super::full_codeword_length(0, 126, usize::MAX).is_err());
+    }
 
     #[test]
     fn test_long_ecc_encode_no_parity() -> Result<(), TestError> {
