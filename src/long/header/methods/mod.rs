@@ -16,4 +16,3 @@ mod segment_distance;
 mod segment_length;
 mod to_bytes;
 mod version;
-
