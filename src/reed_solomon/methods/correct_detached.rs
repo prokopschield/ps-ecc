@@ -20,12 +20,15 @@ impl ReedSolomon {
         parity: &[u8],
         data: &'lt [u8],
     ) -> Result<Codeword<'lt>, RSDecodeError> {
+        // Computing the syndromes first runs the parity-slice checks
+        // (length bound, odd length) before the combined length can fail
+        // the u8 conversion below.
+        let syndromes = Self::compute_syndromes_detached(parity, data)?;
+
         let parity_bytes = parity.len();
         let num_parity = u8::try_from(parity_bytes >> 1)?;
         let length = u8::try_from(parity_bytes + data.len())?;
         let rs = Self::new(num_parity)?;
-
-        let syndromes = Self::compute_syndromes_detached(parity, data)?;
 
         let Some(errors) = Self::compute_errors_detached(num_parity, length, &syndromes)? else {
             return Ok(data.into());
@@ -121,6 +124,21 @@ mod tests {
             ReedSolomon::correct_detached(&parity, &[]),
             Err(RSDecodeError::RSConstructorError(
                 RSConstructorError::ParityTooHigh
+            ))
+        );
+    }
+
+    #[test]
+    fn test_correct_detached_parity_checks_precede_length_conversion() {
+        // One parity byte plus 255 data bytes overflows the u8 combined
+        // length, but the odd parity length is diagnosed first.
+        let parity = [0u8; 1];
+        let data = [0u8; 255];
+
+        assert_eq!(
+            ReedSolomon::correct_detached(&parity, &data),
+            Err(RSDecodeError::RSConstructorError(
+                RSConstructorError::OddParityLength(1)
             ))
         );
     }

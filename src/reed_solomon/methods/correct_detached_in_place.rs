@@ -1,11 +1,12 @@
-use crate::{RSConstructorError, RSDecodeError, ReedSolomon, MAX_PARITY_BYTES};
+use crate::{RSDecodeError, ReedSolomon};
 
 impl ReedSolomon {
     /// Corrects a message based on detached parity bytes.
     /// Also corrects the parity bytes.
     /// # Errors
-    /// - [`RSConstructorError`] is returned if `parity` holds more than
-    ///   [`MAX_PARITY_BYTES`] bytes, or an odd number of bytes.
+    /// - [`RSConstructorError`](crate::RSConstructorError) is returned if
+    ///   `parity` holds more than [`MAX_PARITY_BYTES`](crate::MAX_PARITY_BYTES)
+    ///   bytes, or an odd number of bytes.
     /// - [`std::num::TryFromIntError`] is returned if `parity` and `data`
     ///   together hold more than 255 bytes.
     /// - [`RSComputeErrorsError`](crate::RSComputeErrorsError) is propagated
@@ -16,15 +17,14 @@ impl ReedSolomon {
         parity: &mut [u8],
         data: &mut [u8],
     ) -> Result<(), RSDecodeError> {
-        if parity.len() > usize::from(MAX_PARITY_BYTES) {
-            return Err(RSConstructorError::ParityTooHigh.into());
-        }
+        // Computing the syndromes first runs the parity-slice checks
+        // (length bound, odd length) before the combined length can fail
+        // the u8 conversion below.
+        let syndromes = Self::compute_syndromes_detached(parity, data)?;
 
         let parity_bytes = parity.len();
         let num_parity = u8::try_from(parity_bytes >> 1)?;
         let length = u8::try_from(parity_bytes + data.len())?;
-
-        let syndromes = Self::compute_syndromes_detached(parity, data)?;
 
         let Some(errors) = Self::compute_errors_detached(num_parity, length, &syndromes)? else {
             return Ok(());
