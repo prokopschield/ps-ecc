@@ -4,13 +4,21 @@ use ps_buffer::{Buffer, SharedBuffer};
 
 use crate::cow::Cow;
 
+/// A decoded codeword exposing the message bytes.
+///
+/// Dereferences to the message portion of the codeword, selected by
+/// `range`. The fields are crate-internal so that a range outside the
+/// codeword, which would make dereferencing panic, cannot be constructed
+/// by callers.
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub struct Codeword<'lt> {
-    pub codeword: Cow<'lt>,
-    pub range: Range<usize>,
+    pub(crate) codeword: Cow<'lt>,
+    pub(crate) range: Range<usize>,
 }
 
 impl<'lt> Codeword<'lt> {
+    /// Consumes the view and returns the full underlying codeword,
+    /// including the parity bytes and, for long codewords, the header.
     #[must_use]
     pub fn into_inner(self) -> Cow<'lt> {
         self.codeword
