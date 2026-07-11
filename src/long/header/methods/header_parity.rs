@@ -1,6 +1,7 @@
 use crate::long::LongEccHeader;
 
 impl LongEccHeader {
+    /// Returns the parity bytes protecting the header itself.
     #[inline]
     #[must_use]
     pub const fn header_parity(&self) -> [u8; 8] {

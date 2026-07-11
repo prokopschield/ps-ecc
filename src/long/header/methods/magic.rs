@@ -1,6 +1,7 @@
 use crate::long::LongEccHeader;
 
 impl LongEccHeader {
+    /// Returns the magic number identifying a long ECC header.
     #[inline]
     #[must_use]
     pub const fn magic(&self) -> u16 {

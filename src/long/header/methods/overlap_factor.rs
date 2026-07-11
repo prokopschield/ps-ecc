@@ -3,6 +3,7 @@ use crate::long::LongEccHeader;
 use super::super::OverlapFactor;
 
 impl LongEccHeader {
+    /// Returns the overlap factor: the approximate number of codewords covering each byte.
     #[inline]
     #[must_use]
     pub const fn overlap_factor(&self) -> OverlapFactor {

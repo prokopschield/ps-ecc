@@ -1,6 +1,7 @@
 use crate::long::LongEccHeader;
 
 impl LongEccHeader {
+    /// Returns the length of the encoded message.
     #[inline]
     #[must_use]
     pub const fn message_length(&self) -> u32 {

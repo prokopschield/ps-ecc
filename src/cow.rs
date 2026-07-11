@@ -4,11 +4,15 @@ use std::ops::Deref;
 
 use ps_buffer::{Buffer, BufferError, SharedBuffer};
 
+/// A clone-on-write byte buffer.
+///
 /// Equality, ordering, and hashing compare the referenced bytes, so a
 /// [`Cow::Borrowed`] and a [`Cow::Owned`] with the same content are equal.
 #[derive(Debug)]
 pub enum Cow<'lt> {
+    /// Borrows the caller's bytes; no allocation took place.
     Borrowed(&'lt [u8]),
+    /// Owns a shared buffer, typically holding corrected bytes.
     Owned(SharedBuffer),
 }
 

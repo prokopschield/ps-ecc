@@ -1,7 +1,8 @@
 use crate::long::LongEccHeader;
 
 impl LongEccHeader {
-    /// Number of parity bytes per segment: `2 * parity`, since each parity symbol spans two bytes.
+    /// Returns the number of parity bytes per segment: `2 * parity`, two
+    /// per correctable error.
     #[inline]
     #[must_use]
     pub const fn parity_bytes(&self) -> u8 {

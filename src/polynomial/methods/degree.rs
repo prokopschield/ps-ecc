@@ -1,6 +1,9 @@
 use crate::Polynomial;
 
 impl Polynomial {
+    /// Returns the degree of this polynomial.
+    ///
+    /// The zero polynomial has degree 0 by this definition.
     #[must_use]
     pub const fn degree(&self) -> u8 {
         self.degree

@@ -1,6 +1,7 @@
 use crate::long::LongEccHeader;
 
 impl LongEccHeader {
+    /// Returns the length of the full codeword, including the header and parity.
     #[inline]
     #[must_use]
     pub const fn full_length(&self) -> u32 {

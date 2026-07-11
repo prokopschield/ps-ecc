@@ -1,6 +1,8 @@
 use crate::Polynomial;
 
 impl Polynomial {
+    /// Returns an iterator over the coefficients, from degree 0 to the
+    /// leading term.
     pub fn iter(&self) -> std::slice::Iter<'_, u8> {
         self.coefficients().iter()
     }

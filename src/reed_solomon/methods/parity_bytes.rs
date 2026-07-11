@@ -1,6 +1,8 @@
 use crate::ReedSolomon;
 
 impl ReedSolomon {
+    /// Returns the number of parity bytes per codeword: `2 * parity`, two
+    /// per correctable error.
     #[inline]
     #[must_use]
     pub const fn parity_bytes(&self) -> u8 {

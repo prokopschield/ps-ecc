@@ -1,6 +1,7 @@
 use crate::long::LongEccHeader;
 
 impl LongEccHeader {
+    /// Serializes the header into its 32-byte wire format.
     #[must_use]
     pub fn to_bytes(self) -> [u8; 32] {
         let mut bytes = [0; 32];

@@ -1,6 +1,7 @@
 use crate::long::LongEccHeader;
 
 impl LongEccHeader {
+    /// Returns the error-correction capability per segment: the number of byte errors each segment can recover from.
     #[inline]
     #[must_use]
     pub const fn parity(&self) -> u8 {

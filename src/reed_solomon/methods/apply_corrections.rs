@@ -1,6 +1,10 @@
 use crate::ReedSolomon;
 
 impl ReedSolomon {
+    /// XORs `corrections` onto `target`, element-wise.
+    ///
+    /// The two slices are zipped, so the tail of the longer one is
+    /// ignored; a zero correction byte leaves its target byte unchanged.
     pub fn apply_corrections(target: &mut [u8], corrections: impl AsRef<[u8]>) {
         target
             .iter_mut()

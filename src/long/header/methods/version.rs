@@ -1,6 +1,7 @@
 use crate::long::LongEccHeader;
 
 impl LongEccHeader {
+    /// Returns the encoding version number.
     #[inline]
     #[must_use]
     pub const fn version(&self) -> u8 {

@@ -1,6 +1,7 @@
 use crate::long::LongEccHeader;
 
 impl LongEccHeader {
+    /// Returns the checksum protecting the header fields, folded to 32 bits.
     #[inline]
     #[must_use]
     pub const fn header_checksum(&self) -> u32 {

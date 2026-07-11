@@ -1,6 +1,7 @@
 use crate::long::LongEccHeader;
 
 impl LongEccHeader {
+    /// Returns the XXH64 checksum of the message and parity bytes.
     #[inline]
     #[must_use]
     pub const fn checksum(&self) -> u64 {
