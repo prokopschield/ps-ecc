@@ -17,14 +17,16 @@ impl ReedSolomon {
         parity: &mut [u8],
         data: &mut [u8],
     ) -> Result<(), RSDecodeError> {
-        // Computing the syndromes first runs the parity-slice checks
-        // (length bound, odd length) before the combined length can fail
-        // the u8 conversion below.
-        let syndromes = Self::compute_syndromes_detached(parity, data)?;
+        // The parity-slice checks run first so that a structurally invalid
+        // parity slice is diagnosed before the combined length can fail the
+        // u8 conversion, without computing syndromes on oversized input.
+        Self::check_detached_parity(parity)?;
 
         let parity_bytes = parity.len();
         let num_parity = u8::try_from(parity_bytes >> 1)?;
         let length = u8::try_from(parity_bytes + data.len())?;
+
+        let syndromes = Self::compute_syndromes_detached(parity, data)?;
 
         let Some(errors) = Self::compute_errors_detached(num_parity, length, &syndromes)? else {
             return Ok(());

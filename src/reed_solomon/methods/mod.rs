@@ -1,5 +1,6 @@
 mod apply_corrections;
 mod apply_corrections_detached;
+mod check_detached_parity;
 mod compute_errors;
 mod compute_errors_detached;
 mod compute_syndromes;

@@ -1,5 +1,5 @@
 use crate::finite_field::ANTILOG_TABLE;
-use crate::{Polynomial, RSConstructorError, ReedSolomon, MAX_PARITY_BYTES};
+use crate::{Polynomial, RSConstructorError, ReedSolomon};
 
 impl ReedSolomon {
     /// Computes the syndromes of a given detached codeword.
@@ -8,7 +8,7 @@ impl ReedSolomon {
     /// parity always validates as pristine.
     /// # Errors
     /// - [`RSConstructorError::ParityTooHigh`] is returned if `parity` holds
-    ///   more than [`MAX_PARITY_BYTES`] bytes.
+    ///   more than [`MAX_PARITY_BYTES`](crate::MAX_PARITY_BYTES) bytes.
     /// - [`RSConstructorError::OddParityLength`] is returned if `parity`
     ///   holds an odd number of bytes; parity always comprises two bytes
     ///   per correctable error.
@@ -16,13 +16,7 @@ impl ReedSolomon {
         parity: &[u8],
         data: &[u8],
     ) -> Result<Polynomial, RSConstructorError> {
-        if parity.len() > usize::from(MAX_PARITY_BYTES) {
-            return Err(RSConstructorError::ParityTooHigh);
-        }
-
-        if !parity.len().is_multiple_of(2) {
-            return Err(RSConstructorError::OddParityLength(parity.len()));
-        }
+        Self::check_detached_parity(parity)?;
 
         let syndromes = (0..parity.len())
             .map(|i| {
