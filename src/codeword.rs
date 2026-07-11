@@ -17,8 +17,9 @@ pub struct Codeword<'lt> {
 }
 
 impl<'lt> Codeword<'lt> {
-    /// Consumes the view and returns the full underlying codeword,
-    /// including the parity bytes and, for long codewords, the header.
+    /// Consumes the view and returns the full underlying buffer. Depending
+    /// on the operation that produced this codeword, the buffer may carry
+    /// parity and header bytes in addition to the message.
     #[must_use]
     pub fn into_inner(self) -> Cow<'lt> {
         self.codeword
