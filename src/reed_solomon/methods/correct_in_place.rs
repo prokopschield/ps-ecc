@@ -3,12 +3,25 @@ use crate::{RSDecodeError, ReedSolomon};
 impl ReedSolomon {
     /// Corrects a received codeword in-place.
     /// # Errors
-    /// - [`ps_buffer::BufferError`] is returned if memory allocation fails.
-    /// - [`RSDecodeError`] is propagated from [`ReedSolomon::compute_errors`].
+    /// - [`RSDecodeError::InsufficientLength`] is returned if `received` holds
+    ///   fewer bytes than [`ReedSolomon::parity_bytes`].
+    /// - [`std::num::TryFromIntError`] is returned if `received` holds more
+    ///   than 255 bytes.
+    /// - [`RSComputeErrorsError`](crate::RSComputeErrorsError) is propagated
+    ///   from [`ReedSolomon::compute_errors`].
     /// - [`RSDecodeError::TooManyErrors`] is returned if the data is unrecoverable.
     pub fn correct_in_place(&self, received: &mut [u8]) -> Result<(), RSDecodeError> {
+        let parity_bytes = self.parity_bytes();
+
+        if received.len() < usize::from(parity_bytes) {
+            return Err(RSDecodeError::InsufficientLength {
+                parity_bytes,
+                received: received.len(),
+            });
+        }
+
         let received_len = u8::try_from(received.len())?;
-        let syndromes = Self::compute_syndromes(self.parity_bytes(), received);
+        let syndromes = Self::compute_syndromes(parity_bytes, received);
 
         let Some(errors) = self.compute_errors(received_len, &syndromes)? else {
             return Ok(());
@@ -73,6 +86,25 @@ mod tests {
             Err(RSDecodeError::RSComputeErrorsError(
                 RSComputeErrorsError::TooManyErrors
             ))
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_correct_in_place_rejects_input_shorter_than_parity() -> Result<(), TestError> {
+        // An all-zero truncated slice yields zero syndromes; without the
+        // length check it was accepted unchanged as a pristine codeword.
+        let rs = ReedSolomon::new(4)?;
+
+        let mut received = [0u8; 7];
+
+        assert_eq!(
+            rs.correct_in_place(&mut received),
+            Err(RSDecodeError::InsufficientLength {
+                parity_bytes: 8,
+                received: 7,
+            })
         );
 
         Ok(())
