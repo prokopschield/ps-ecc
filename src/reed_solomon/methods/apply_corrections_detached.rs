@@ -5,7 +5,7 @@ impl ReedSolomon {
     ///
     /// The `corrections` slice is laid out parity-first, matching the
     /// `parity || data` codeword layout: its first `parity.len()` bytes are
-    /// XORed onto `parity`, and the remaining bytes onto `data`.
+    /// `XORed` onto `parity`, and the remaining bytes onto `data`.
     ///
     /// Like [`ReedSolomon::apply_corrections`], this method uses truncating
     /// zip semantics. If `corrections` holds fewer bytes than `parity` and
