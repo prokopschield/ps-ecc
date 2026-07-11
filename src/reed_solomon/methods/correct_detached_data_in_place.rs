@@ -23,7 +23,7 @@ impl ReedSolomon {
         let num_parity = u8::try_from(parity_len >> 1)?;
         let length = u8::try_from(parity_len + data.len())?;
 
-        let syndromes = Self::compute_syndromes_detached(parity, data);
+        let syndromes = Self::compute_syndromes_detached(parity, data)?;
 
         let Some(errors) = Self::compute_errors_detached(num_parity, length, &syndromes)? else {
             return Ok(());
@@ -44,7 +44,7 @@ impl ReedSolomon {
             &corrections[..parity_len],
         );
 
-        match Self::validate_detached(&corrected_parity[..parity_len], data) {
+        match Self::validate_detached(&corrected_parity[..parity_len], data)? {
             None => Ok(()),
             Some(_) => Err(RSDecodeError::TooManyErrors),
         }

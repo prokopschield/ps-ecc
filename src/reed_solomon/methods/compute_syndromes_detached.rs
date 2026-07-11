@@ -1,15 +1,26 @@
 use crate::finite_field::ANTILOG_TABLE;
-use crate::{Polynomial, ReedSolomon};
+use crate::{Polynomial, RSConstructorError, ReedSolomon, MAX_PARITY_BYTES};
 
 impl ReedSolomon {
     /// Computes the syndromes of a given detached codeword.
-    #[must_use]
-    pub fn compute_syndromes_detached(parity: &[u8], data: &[u8]) -> Polynomial {
-        (0..parity.len())
+    /// # Errors
+    /// - [`RSConstructorError::ParityTooHigh`] is returned if `parity` holds
+    ///   more than [`MAX_PARITY_BYTES`] bytes.
+    pub fn compute_syndromes_detached(
+        parity: &[u8],
+        data: &[u8],
+    ) -> Result<Polynomial, RSConstructorError> {
+        if parity.len() > usize::from(MAX_PARITY_BYTES) {
+            return Err(RSConstructorError::ParityTooHigh);
+        }
+
+        let syndromes = (0..parity.len())
             .map(|i| {
                 Polynomial::eval_coefficient_slices_at(&[parity, data], ANTILOG_TABLE[i + 1].get())
             })
-            .collect()
+            .collect();
+
+        Ok(syndromes)
     }
 }
 
@@ -17,7 +28,7 @@ impl ReedSolomon {
 mod tests {
     use ps_buffer::ToBuffer;
 
-    use crate::ReedSolomon;
+    use crate::{RSConstructorError, ReedSolomon, MAX_PARITY_BYTES};
 
     type TestError = Box<dyn std::error::Error>;
 
@@ -27,7 +38,7 @@ mod tests {
         let message = b"Detached".to_buffer()?;
         let parity = rs.generate_parity(&message)?;
 
-        let syndromes = ReedSolomon::compute_syndromes_detached(&parity, &message);
+        let syndromes = ReedSolomon::compute_syndromes_detached(&parity, &message)?;
 
         assert!(syndromes.is_zero());
 
@@ -44,7 +55,7 @@ mod tests {
 
         corrupted[2] ^= 2;
 
-        let syndromes = ReedSolomon::compute_syndromes_detached(&parity, &corrupted);
+        let syndromes = ReedSolomon::compute_syndromes_detached(&parity, &corrupted)?;
 
         assert!(syndromes.iter().any(|&s| s != 0));
 
@@ -56,11 +67,37 @@ mod tests {
         let rs = ReedSolomon::new(2)?;
         let parity = rs.generate_parity(&[])?;
 
-        let syndromes = ReedSolomon::compute_syndromes_detached(&parity, &[]);
+        let syndromes = ReedSolomon::compute_syndromes_detached(&parity, &[])?;
 
         assert_eq!(syndromes.degree(), 0);
         assert!(syndromes.is_zero());
 
         Ok(())
+    }
+
+    #[test]
+    fn test_compute_syndromes_detached_max_parity_bytes() -> Result<(), TestError> {
+        let parity = [0u8; MAX_PARITY_BYTES as usize];
+
+        let syndromes = ReedSolomon::compute_syndromes_detached(&parity, &[])?;
+
+        assert!(syndromes.is_zero());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_compute_syndromes_detached_rejects_oversized_parity() {
+        // Without the length bound, an oversized parity slice was silently
+        // accepted; collection into Polynomial consumes at most 255
+        // coefficients, so the syndromes were silently truncated.
+        for parity_len in [127usize, 256, 300] {
+            let parity = vec![0u8; parity_len];
+
+            assert_eq!(
+                ReedSolomon::compute_syndromes_detached(&parity, &[]),
+                Err(RSConstructorError::ParityTooHigh)
+            );
+        }
     }
 }

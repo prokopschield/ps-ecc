@@ -6,8 +6,16 @@ use crate::{Codeword, RSDecodeError, ReedSolomon};
 impl ReedSolomon {
     /// Corrects a message based on detached parity bytes.
     /// # Errors
+    /// - [`RSConstructorError`](crate::RSConstructorError) is returned if
+    ///   `parity` holds more than [`MAX_PARITY_BYTES`](crate::MAX_PARITY_BYTES)
+    ///   bytes.
+    /// - [`std::num::TryFromIntError`] is returned if `parity` and `data`
+    ///   together hold more than 255 bytes.
     /// - [`ps_buffer::BufferError`] is returned if memory allocation fails.
-    /// - [`RSDecodeError`] is propagated from [`ReedSolomon::compute_errors`].
+    /// - [`RSComputeErrorsError`](crate::RSComputeErrorsError) is propagated
+    ///   from [`ReedSolomon::compute_errors`].
+    /// - [`RSDecodeError::TooManyErrors`] is returned if the corrected bytes
+    ///   fail validation.
     pub fn correct_detached<'lt>(
         parity: &[u8],
         data: &'lt [u8],
@@ -17,7 +25,7 @@ impl ReedSolomon {
         let length = u8::try_from(parity_bytes + data.len())?;
         let rs = Self::new(num_parity)?;
 
-        let syndromes = Self::compute_syndromes_detached(parity, data);
+        let syndromes = Self::compute_syndromes_detached(parity, data)?;
 
         let Some(errors) = Self::compute_errors_detached(num_parity, length, &syndromes)? else {
             return Ok(data.into());
@@ -47,7 +55,7 @@ impl ReedSolomon {
 mod tests {
     use ps_buffer::{Buffer, ToBuffer};
 
-    use crate::{RSComputeErrorsError, RSDecodeError, ReedSolomon};
+    use crate::{RSComputeErrorsError, RSConstructorError, RSDecodeError, ReedSolomon};
 
     type TestError = Box<dyn std::error::Error>;
 
@@ -100,6 +108,21 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    #[test]
+    fn test_correct_detached_rejects_oversized_parity() {
+        // A 127-byte parity slice was previously accepted and silently
+        // truncated to a parity count of 63; it is now rejected, matching
+        // the in-place variants.
+        let parity = [0u8; 127];
+
+        assert_eq!(
+            ReedSolomon::correct_detached(&parity, &[]),
+            Err(RSDecodeError::RSConstructorError(
+                RSConstructorError::ParityTooHigh
+            ))
+        );
     }
 
     #[test]
