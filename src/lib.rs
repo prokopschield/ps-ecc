@@ -6,7 +6,7 @@
 //!   appropriate format automatically: messages that fit a single
 //!   Reed-Solomon codeword (at most `255 - 2 * parity` bytes) are encoded
 //!   directly, and longer messages use the long ECC format, which splits
-//!   the message into overlapping 255-byte segments behind a checksummed
+//!   the message into segments of at most 255 bytes behind a checksummed
 //!   header.
 //! - [`ReedSolomon`] encodes, validates, and corrects single codewords,
 //!   either attached (`parity || data` in one slice) or detached (parity
@@ -14,9 +14,11 @@
 //! - [`Polynomial`] and [`euclidean`] expose the underlying GF(256)
 //!   polynomial arithmetic.
 //!
-//! The `parity` parameter throughout is the error-correction capability:
-//! the number of byte errors a codeword can recover from, each costing two
-//! parity bytes. It is capped at [`MAX_PARITY`] (63).
+//! The `parity` count parameter is the error-correction capability: the
+//! number of byte errors a codeword can recover from, each costing two
+//! parity bytes. It is capped at [`MAX_PARITY`] (63). The detached APIs
+//! instead take the generated parity bytes themselves, capped at
+//! [`MAX_PARITY_BYTES`] (126).
 
 mod codeword;
 mod cow;

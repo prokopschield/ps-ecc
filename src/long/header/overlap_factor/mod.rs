@@ -1,7 +1,7 @@
 mod implementations;
 mod methods;
 
-/// approximate number of distinct codewords covering each byte
+/// Approximate number of distinct codewords covering each byte.
 ///
 /// Integer division of the segment stride makes coverage uneven for the
 /// overlapping factors: bytes near segment boundaries may be covered one
@@ -9,16 +9,16 @@ mod methods;
 #[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(u8)]
 pub enum OverlapFactor {
-    /// each byte is covered once (plain Reed-Solomon, no overlap)
+    /// Each byte is covered once (plain Reed-Solomon, no overlap).
     #[default]
     Simple = 0,
 
-    /// each byte is covered approximately twice
+    /// Each byte is covered approximately twice.
     Double = 64,
 
-    /// each byte is covered approximately three times
+    /// Each byte is covered approximately three times.
     Triple = 128,
 
-    /// each byte is covered approximately four times
+    /// Each byte is covered approximately four times.
     Quadruple = 192,
 }

@@ -1,8 +1,9 @@
 use crate::long::LongEccHeader;
 
 impl LongEccHeader {
-    /// Stride between consecutive segment starts: `segment_length` divided by the overlap
-    /// factor, so segments cover each byte `overlap_factor` times.
+    /// Stride between consecutive segment starts: `segment_length` divided
+    /// by the overlap count, rounded down, so segments cover each byte
+    /// approximately `overlap_factor` times.
     #[inline]
     #[must_use]
     pub const fn segment_distance(&self) -> u8 {

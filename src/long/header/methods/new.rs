@@ -10,16 +10,24 @@ use crate::{
 
 use super::super::RS;
 
+/// Errors returned by [`LongEccHeader::new`](crate::LongEccHeader::new).
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
 pub enum LongEccHeaderConstructorError {
+    /// Propagated from generating the header parity.
     #[error("Generating parity failed: {0}")]
     GenerateParity(#[from] RSGenerateParityError),
+    /// The full length does not match the codeword length derived from the
+    /// message length and segment geometry.
     #[error("Full length {0} does not match the derived codeword length {1}.")]
     InvalidFullLength(u32, u64),
+    /// The header and message do not fit within the full length.
     #[error("Message length {0} does not fit within full length {1}.")]
     InvalidMessageLength(u32, u32),
+    /// The error-correction capability exceeds
+    /// [`MAX_PARITY`](crate::MAX_PARITY).
     #[error("Invalid parity count: {0}.")]
     InvalidParityCount(u8),
+    /// The parity bytes leave no room for new data within a segment.
     #[error("Invalid segment-to-parity ratio: {0} <= 2 * {1}.")]
     InvalidSegmentParityRatio(u8, u8),
 }

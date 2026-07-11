@@ -2,11 +2,15 @@ use crate::long::LongEccHeader;
 
 use super::LongEccHeaderFromBytesError;
 
+/// Errors returned by
+/// [`LongEccHeader::from_byte_slice`](crate::LongEccHeader::from_byte_slice).
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
 pub enum LongEccHeaderFromByteSliceError {
+    /// The slice holds fewer than the 32 bytes a header occupies.
     #[error("Insufficient bytes for header: got {0}, need 32.")]
     InsufficientBytes(usize),
 
+    /// Propagated from parsing the 32-byte header.
     #[error(transparent)]
     FromBytes(#[from] LongEccHeaderFromBytesError),
 }

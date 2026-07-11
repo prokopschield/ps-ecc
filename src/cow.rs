@@ -4,7 +4,7 @@ use std::ops::Deref;
 
 use ps_buffer::{Buffer, BufferError, SharedBuffer};
 
-/// A clone-on-write byte buffer.
+/// A borrowed-or-owned byte buffer.
 ///
 /// Equality, ordering, and hashing compare the referenced bytes, so a
 /// [`Cow::Borrowed`] and a [`Cow::Owned`] with the same content are equal.

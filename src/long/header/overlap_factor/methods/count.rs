@@ -1,7 +1,8 @@
 use super::super::OverlapFactor;
 
 impl OverlapFactor {
-    /// Returns the coverage count: the number of codewords protecting each byte (1 to 4).
+    /// Returns the nominal coverage count: the approximate number of
+    /// codewords protecting each byte (1 to 4).
     #[inline]
     #[must_use]
     pub const fn count(self) -> u8 {

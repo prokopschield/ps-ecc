@@ -11,26 +11,36 @@ use crate::{
     RSDecodeError, ReedSolomon,
 };
 
+/// Errors returned by
+/// [`LongEccHeader::from_bytes`](crate::LongEccHeader::from_bytes).
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
 pub enum LongEccHeaderFromBytesError {
+    /// The magic number does not identify a long ECC header.
     #[error("Incorrect magic number: {0:x}.")]
     IncorrectMagic(u16),
 
+    /// The encoding version is not supported.
     #[error("Incorrect version number: {0}.")]
     InvalidVersion(u8),
 
+    /// The header checksum mismatches even after error correction.
     #[error("Header checksum incorrect.")]
     IncorrectChecksum,
 
+    /// Propagated from correcting the header bytes with the header parity.
     #[error("Header error correction failed: {0}")]
     CorrectionFailed(#[from] RSDecodeError),
 
+    /// The header and message do not fit within the full length.
     #[error("Message length {0} does not fit within full length {1}.")]
     InvalidMessageLength(u32, u32),
 
+    /// The parity bytes leave no room for new data within a segment.
     #[error("Invalid segment-to-parity ratio: {0} <= 2 * {1}.")]
     InvalidSegmentParityRatio(u8, u8),
 
+    /// The full length does not match the codeword length derived from the
+    /// message length and segment geometry.
     #[error("Full length {0} does not match the derived codeword length {1}.")]
     InvalidFullLength(u32, u64),
 }

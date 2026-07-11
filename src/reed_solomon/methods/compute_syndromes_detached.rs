@@ -94,7 +94,8 @@ mod tests {
     fn test_compute_syndromes_detached_rejects_odd_parity_length() {
         // num_parity = parity.len() >> 1 silently dropped the odd byte
         // while the syndromes covered the full slice; odd lengths are now
-        // rejected because generate_parity only produces two-byte symbols.
+        // rejected because generate_parity always produces two parity
+        // bytes per correctable error.
         for parity_len in [1usize, 3, 125] {
             let parity = vec![0u8; parity_len];
 
