@@ -9,11 +9,13 @@ use super::HEADER_SIZE;
 /// Decodes a codeword to extract the original message.
 pub fn decode(codeword: &[u8]) -> Result<Codeword<'_>, LongEccDecodeError> {
     let (header, is_ok) = fast_validate(codeword)?;
+    let message_length = usize::try_from(header.message_length())?;
+    let range = HEADER_SIZE..HEADER_SIZE + message_length;
 
     if is_ok {
         return Ok(Codeword {
             codeword: codeword.into(),
-            range: HEADER_SIZE..HEADER_SIZE + usize::try_from(header.message_length())?,
+            range,
         });
     }
 
@@ -25,10 +27,9 @@ pub fn decode(codeword: &[u8]) -> Result<Codeword<'_>, LongEccDecodeError> {
     buffer.extend_from_slice(&codeword[..codeword_bytes_to_copy])?;
     correct_in_place_slow_path(&mut buffer)?;
 
-    let message_length = usize::try_from(header.message_length())?;
     let codeword = Codeword {
         codeword: buffer.into(),
-        range: HEADER_SIZE..HEADER_SIZE + message_length,
+        range,
     };
 
     Ok(codeword)
