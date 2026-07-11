@@ -111,6 +111,21 @@ mod tests {
     }
 
     #[test]
+    fn test_correct_in_place_accepts_parity_only_codeword() -> Result<(), TestError> {
+        // The encoding of the empty message is all-zero parity; a slice of
+        // exactly parity_bytes zeros is that codeword and passes the guard.
+        let rs = ReedSolomon::new(4)?;
+
+        let mut received = [0u8; 8];
+
+        rs.correct_in_place(&mut received)?;
+
+        assert_eq!(received, [0u8; 8]);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_correct_in_place_multiple_errors_at_boundaries() -> Result<(), TestError> {
         let rs = ReedSolomon::new(4)?;
         let message = b"Boundary".to_buffer()?;
