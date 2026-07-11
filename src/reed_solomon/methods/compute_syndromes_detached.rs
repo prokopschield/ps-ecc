@@ -10,8 +10,8 @@ impl ReedSolomon {
     /// - [`RSConstructorError::ParityTooHigh`] is returned if `parity` holds
     ///   more than [`MAX_PARITY_BYTES`] bytes.
     /// - [`RSConstructorError::OddParityLength`] is returned if `parity`
-    ///   holds an odd number of bytes; parity is always generated in
-    ///   two-byte symbols.
+    ///   holds an odd number of bytes; parity always comprises two bytes
+    ///   per correctable error.
     pub fn compute_syndromes_detached(
         parity: &[u8],
         data: &[u8],

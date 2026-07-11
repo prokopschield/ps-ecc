@@ -19,8 +19,9 @@ pub struct LongEccHeader {
     /// encoding version number (currently 1)
     version: u8,
 
-    /// number of parity symbols (each symbol spans 2 bytes) in the low six bits,
-    /// with the [`OverlapFactor`] packed into the high two bits
+    /// error-correction capability (each correctable error costs two parity
+    /// bytes) in the low six bits, with the [`OverlapFactor`] packed into
+    /// the high two bits
     parity: u8,
 
     /// length of the full codeword, including header and parity

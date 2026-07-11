@@ -1,7 +1,7 @@
-/// Maximum parity symbol count for Reed-Solomon encoding.
+/// Maximum error-correction capability of a Reed-Solomon codec.
 ///
-/// This limits the error-correction capability to at most 63 symbols,
-/// which corresponds to 126 parity bytes.
+/// A codec can correct at most 63 byte errors per codeword, which costs
+/// 126 parity bytes: two per correctable error.
 ///
 /// Using parity values greater than 63 is impractical in GF(256) Reed-Solomon
 /// codes, as it would more than double the data size. If redundancy beyond 2x
