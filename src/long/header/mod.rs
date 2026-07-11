@@ -6,7 +6,6 @@ mod utils;
 
 use codec::RS;
 pub use magic::LONG_ECC_HEADER_MAGIC;
-pub use methods::*;
 pub use overlap_factor::OverlapFactor;
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]

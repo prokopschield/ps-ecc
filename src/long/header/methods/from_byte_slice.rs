@@ -1,26 +1,13 @@
 use crate::long::LongEccHeader;
-
-use super::LongEccHeaderFromBytesError;
-
-/// Errors returned by
-/// [`LongEccHeader::from_byte_slice`](crate::LongEccHeader::from_byte_slice).
-#[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
-pub enum LongEccHeaderFromByteSliceError {
-    /// The slice holds fewer than the 32 bytes a header occupies.
-    #[error("Insufficient bytes for header: got {0}, need 32.")]
-    InsufficientBytes(usize),
-
-    /// Propagated from parsing the 32-byte header.
-    #[error(transparent)]
-    FromBytes(#[from] LongEccHeaderFromBytesError),
-}
+use crate::LongEccHeaderFromByteSliceError;
 
 impl LongEccHeader {
     /// Parses a header from the first 32 bytes of a slice.
     ///
     /// # Errors
     /// Returns `InsufficientBytes` if `bytes` holds fewer than 32 bytes, or a
-    /// [`LongEccHeaderFromBytesError`] if parsing the header fails.
+    /// [`LongEccHeaderFromBytesError`](crate::LongEccHeaderFromBytesError)
+    /// if parsing the header fails.
     pub fn from_byte_slice(bytes: &[u8]) -> Result<Self, LongEccHeaderFromByteSliceError> {
         let len = bytes.len();
 

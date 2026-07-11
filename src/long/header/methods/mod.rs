@@ -17,6 +17,3 @@ mod segment_length;
 mod to_bytes;
 mod version;
 
-pub use from_byte_slice::LongEccHeaderFromByteSliceError;
-pub use from_bytes::LongEccHeaderFromBytesError;
-pub use new::LongEccHeaderConstructorError;

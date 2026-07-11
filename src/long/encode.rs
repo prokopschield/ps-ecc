@@ -32,7 +32,7 @@ fn full_codeword_length(
 /// - [`std::num::TryFromIntError`] is returned if the encoded codeword
 ///   would exceed [`u32::MAX`] bytes.
 /// - [`ps_buffer::BufferError`] is returned if memory allocation fails.
-/// - [`LongEccHeaderConstructorError`](crate::long::LongEccHeaderConstructorError)
+/// - [`LongEccHeaderConstructorError`](crate::LongEccHeaderConstructorError)
 ///   is returned if header construction fails.
 /// - [`RSGenerateParityError`](crate::RSGenerateParityError) is propagated
 ///   from parity generation.
