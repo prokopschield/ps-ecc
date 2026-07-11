@@ -4,7 +4,7 @@ use super::checksums::xxh64;
 use super::fast_validate::fast_validate;
 use super::{LongEccHeader, HEADER_SIZE};
 
-/// Correct errors in-place in a codeword
+/// Corrects errors in-place in a codeword.
 pub fn correct_in_place(codeword: &mut [u8]) -> Result<LongEccHeader, LongEccDecodeError> {
     use LongEccDecodeError::{
         IntegrityCheckFailed, InvalidCodeword, ReadDataError, ReadParityError,

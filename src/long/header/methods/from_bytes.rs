@@ -13,10 +13,10 @@ use crate::{
 
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
 pub enum LongEccHeaderFromBytesError {
-    #[error("Incorrect magic number: {0:x}")]
+    #[error("Incorrect magic number: {0:x}.")]
     IncorrectMagic(u16),
 
-    #[error("Incorrect version number: {0}")]
+    #[error("Incorrect version number: {0}.")]
     InvalidVersion(u8),
 
     #[error("Header checksum incorrect.")]
@@ -25,13 +25,13 @@ pub enum LongEccHeaderFromBytesError {
     #[error("Header error correction failed: {0}")]
     CorrectionFailed(#[from] RSDecodeError),
 
-    #[error("Message length {0} does not fit within full length {1}")]
+    #[error("Message length {0} does not fit within full length {1}.")]
     InvalidMessageLength(u32, u32),
 
-    #[error("Invalid segment-to-parity ratio: {0} <= 2 * {1}")]
+    #[error("Invalid segment-to-parity ratio: {0} <= 2 * {1}.")]
     InvalidSegmentParityRatio(u8, u8),
 
-    #[error("Full length {0} does not match the derived codeword length {1}")]
+    #[error("Full length {0} does not match the derived codeword length {1}.")]
     InvalidFullLength(u32, u64),
 }
 

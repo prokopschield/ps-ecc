@@ -14,13 +14,13 @@ use super::super::RS;
 pub enum LongEccHeaderConstructorError {
     #[error("Generating parity failed: {0}")]
     GenerateParity(#[from] RSGenerateParityError),
-    #[error("Full length {0} does not match the derived codeword length {1}")]
+    #[error("Full length {0} does not match the derived codeword length {1}.")]
     InvalidFullLength(u32, u64),
-    #[error("Message length {0} does not fit within full length {1}")]
+    #[error("Message length {0} does not fit within full length {1}.")]
     InvalidMessageLength(u32, u32),
-    #[error("Invalid parity count: {0}")]
+    #[error("Invalid parity count: {0}.")]
     InvalidParityCount(u8),
-    #[error("Invalid segment-to-parity ratio: {0} <= 2 * {1}")]
+    #[error("Invalid segment-to-parity ratio: {0} <= 2 * {1}.")]
     InvalidSegmentParityRatio(u8, u8),
 }
 

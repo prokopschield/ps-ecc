@@ -5,7 +5,7 @@ use crate::{Codeword, LongEccDecodeError};
 use super::correct_in_place::correct_in_place;
 use super::HEADER_SIZE;
 
-/// Decode a codeword to extract the original message
+/// Decodes a codeword to extract the original message.
 pub fn decode(codeword: &[u8]) -> Result<Codeword<'_>, LongEccDecodeError> {
     let mut buffer = Buffer::from_slice(codeword)?;
     let header = correct_in_place(&mut buffer)?;

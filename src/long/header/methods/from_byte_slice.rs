@@ -4,7 +4,7 @@ use super::LongEccHeaderFromBytesError;
 
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
 pub enum LongEccHeaderFromByteSliceError {
-    #[error("Insufficient bytes for header: got {0}, need 32")]
+    #[error("Insufficient bytes for header: got {0}, need 32.")]
     InsufficientBytes(usize),
 
     #[error(transparent)]

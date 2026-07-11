@@ -146,9 +146,9 @@ pub enum LongEccEncodeError {
     BufferError(#[from] BufferError),
     #[error("Parity {0} >= 64, which is too high.")]
     InvalidParity(u8),
-    #[error("Invalid segment-to-parity ratio: {0} <= 2 * {1}")]
+    #[error("Invalid segment-to-parity ratio: {0} <= 2 * {1}.")]
     InvalidSegmentParityRatio(u8, u8),
-    #[error("Long ECC Header construction failed: {0}")]
+    #[error("Long ECC header construction failed: {0}")]
     LongEccHeaderCtor(#[from] LongEccHeaderConstructorError),
     #[error(transparent)]
     RSConstructorError(#[from] RSConstructorError),
@@ -162,7 +162,7 @@ pub enum LongEccEncodeError {
 pub enum LongEccDecodeError {
     #[error(transparent)]
     BufferError(#[from] BufferError),
-    #[error("Integrity check failed after correction")]
+    #[error("Integrity check failed after correction.")]
     IntegrityCheckFailed,
     #[error("Codeword is invalid.")]
     InvalidCodeword,
