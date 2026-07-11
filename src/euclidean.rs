@@ -7,13 +7,15 @@ use crate::{EuclideanError, Polynomial};
 
 /// Extended Euclidean algorithm for Reed-Solomon decoding.
 ///
-/// Given syndrome polynomial and parity count `t`, computes the error
-/// locator polynomial (sigma) and error evaluator polynomial (omega).
+/// Given a syndrome polynomial and the error-correction capability `t`,
+/// computes the error locator polynomial (sigma) and the error evaluator
+/// polynomial (omega). The syndrome polynomial has `2 * t` coefficients.
 ///
 /// # Arguments
 ///
 /// * `syndromes` - Syndrome polynomial
-/// * `t` - Number of parity symbols (must satisfy `2*t <= 255`)
+/// * `t` - Error-correction capability, the number of correctable errors;
+///   must satisfy `2 * t <= 254` so that `x^(2t)` is representable
 ///
 /// # Returns
 ///
@@ -23,20 +25,26 @@ use crate::{EuclideanError, Polynomial};
 ///
 /// # Errors
 ///
-/// Returns an error if division by zero occurs (indicates invalid input),
-/// or if an intermediate product would exceed the maximum polynomial degree
-/// (not expected to occur).
+/// - [`EuclideanError::CapabilityTooHigh`] is returned if `2 * t` exceeds
+///   [`Polynomial::MAX_DEGREE`].
+/// - An error is returned if division by zero occurs (indicates invalid
+///   input), or if an intermediate product would exceed the maximum
+///   polynomial degree (not expected to occur).
 pub fn euclidean(
     syndromes: &Polynomial,
     t: u8,
 ) -> Result<(Polynomial, Polynomial), EuclideanError> {
+    let two_t = usize::from(t) * 2;
+
+    if two_t > usize::from(Polynomial::MAX_DEGREE) {
+        return Err(EuclideanError::CapabilityTooHigh { t });
+    }
+
     // Ring buffers: r[idx] is current, r[idx ^ 1] is previous
     let mut r: [Polynomial; 2] = [Polynomial::default(), Polynomial::default()];
     let mut t_poly: [Polynomial; 2] = [Polynomial::default(), Polynomial::default()];
 
     // r[0] = x^(2t)
-    let two_t = usize::from(t) * 2;
-
     #[allow(clippy::cast_possible_truncation)]
     r[0].set(two_t as u8, 1);
 
@@ -218,6 +226,20 @@ mod tests {
             omega.degree(),
             t
         );
+    }
+
+    #[test]
+    fn euclidean_rejects_capability_above_127() {
+        // For t = 128, 2 * t = 256 previously wrapped to x^0 in the u8
+        // cast, silently returning garbage (sigma, omega).
+        let syndromes: Polynomial = [1u8; 4].into_iter().collect();
+
+        for t in [128, 200, 255] {
+            assert_eq!(
+                euclidean(&syndromes, t),
+                Err(EuclideanError::CapabilityTooHigh { t })
+            );
+        }
     }
 
     #[test]

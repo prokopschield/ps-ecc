@@ -47,6 +47,10 @@ pub enum PolynomialXorError {
 
 #[derive(Error, Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum EuclideanError {
+    /// The error-correction capability `t` requires the polynomial `x^(2t)`,
+    /// whose degree exceeds [`Polynomial::MAX_DEGREE`](crate::Polynomial::MAX_DEGREE).
+    #[error("Error-correction capability {t} exceeds the maximum of 127.")]
+    CapabilityTooHigh { t: u8 },
     #[error(transparent)]
     PolynomialDiv(#[from] PolynomialDivError),
     #[error(transparent)]
