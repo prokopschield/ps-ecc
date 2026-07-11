@@ -11,6 +11,8 @@ impl ParityBytes {
     /// [`ReedSolomon::generate_parity`](crate::ReedSolomon::generate_parity),
     /// passes a parity count already validated by
     /// [`ReedSolomon::new`](crate::ReedSolomon::new).
+    /// # Panics
+    /// Panics in debug builds if `parity` exceeds [`MAX_PARITY`].
     #[must_use]
     pub(crate) fn new(remainder: &Polynomial, parity: u8) -> Self {
         debug_assert!(
