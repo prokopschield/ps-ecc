@@ -7,7 +7,19 @@ use crate::{LongEccEncodeError, ReedSolomon, MAX_PARITY};
 use super::checksums::xxh64;
 use super::{LongEccHeader, OverlapFactor, HEADER_SIZE};
 
-/// Encode a message with long ECC protection
+/// Encodes a message with long ECC protection.
+/// # Errors
+/// - [`LongEccEncodeError::InvalidParity`] is returned if `parity` exceeds
+///   [`MAX_PARITY`].
+/// - [`LongEccEncodeError::InvalidSegmentParityRatio`] is returned if the
+///   parity bytes of a segment would not fit within the segment stride.
+/// - [`std::num::TryFromIntError`] is returned if the encoded codeword
+///   would exceed [`u32::MAX`] bytes.
+/// - [`ps_buffer::BufferError`] is returned if memory allocation fails.
+/// - [`LongEccHeaderConstructorError`](crate::long::LongEccHeaderConstructorError)
+///   is returned if header construction fails.
+/// - [`RSGenerateParityError`](crate::RSGenerateParityError) is propagated
+///   from parity generation.
 pub fn encode(
     message: &[u8],
     parity: u8,
@@ -45,8 +57,15 @@ pub fn encode(
         .div_ceil(new_bytes_per_segment)
         .saturating_add(1);
 
-    // Calculate total size
-    let full_length = HEADER_SIZE + base_len + parity_bytes_per_segment * segment_count;
+    // Calculate the total size. The header stores it as u32; checking the
+    // bound here fails an oversized encode before allocation and parity
+    // generation. The u128 arithmetic cannot overflow, unlike usize on
+    // 32-bit targets.
+    let full_length_u128 = u128::try_from(HEADER_SIZE)?
+        + u128::try_from(base_len)?
+        + u128::try_from(parity_bytes_per_segment)? * u128::try_from(segment_count)?;
+    let full_length_u32 = u32::try_from(full_length_u128)?;
+    let full_length = usize::try_from(full_length_u32)?;
 
     // Initialize the output buffer, reserving zeroed space for the header;
     // the header is written last so that its checksum can cover the parity.
@@ -91,7 +110,7 @@ pub fn encode(
     let header = LongEccHeader::new(
         parity,
         overlap_factor,
-        u32::try_from(full_length)?,
+        full_length_u32,
         message.len().try_into()?,
         checksum,
     )?;
